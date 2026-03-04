@@ -86,9 +86,7 @@ export type { AccountSetup } from './factory.js'
 
 // Unified Tool Factory
 export { createTradingTools } from './adapter.js'
-
-// TradingGit Tools (sub-set used by adapter.ts)
-export { createTradingGitTools } from './git/adapter.js'
+export type { AccountResolver } from './adapter.js'
 
 // Providers
 export { AlpacaAccount } from './providers/alpaca/index.js'

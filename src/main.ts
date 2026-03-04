@@ -90,14 +90,6 @@ async function main() {
   // Needed for reconnect (re-wiring) and git lookups.
   const accountSetups = new Map<string, { setup: AccountSetup; gitFilePath: string }>()
 
-  // Helper: register an account's tools after wiring
-  const registerAccountTools = (setup: AccountSetup, toolGroupId: string) => {
-    toolCenter.register(
-      createTradingTools(setup.account, setup.git, setup.getGitState),
-      toolGroupId,
-    )
-  }
-
   // ==================== Alpaca (securities) — sync init ====================
 
   const alpacaAccount = createAlpacaFromConfig(config.securities)
@@ -213,11 +205,15 @@ async function main() {
   const toolCenter = new ToolCenter()
   toolCenter.register(createThinkingTools(), 'thinking')
 
-  // Register Alpaca trading tools (CCXT tools registered later in background)
-  if (alpacaReady) {
-    const entry = accountSetups.get(alpacaAccount!.id)!
-    registerAccountTools(entry.setup, `trading-${alpacaAccount!.id}`)
-  }
+  // One unified set of trading tools — routes via `source` parameter at runtime
+  toolCenter.register(
+    createTradingTools({
+      accountManager,
+      getGit: (id) => accountSetups.get(id)?.setup.git,
+      getGitState: (id) => accountSetups.get(id)?.setup.getGitState(),
+    }),
+    'trading',
+  )
 
   toolCenter.register(createBrainTools(brain), 'brain')
   toolCenter.register(createBrowserTools(), 'browser')
@@ -238,7 +234,7 @@ async function main() {
   }
   toolCenter.register(createAnalysisTools(equityClient, cryptoClient, currencyClient), 'analysis')
 
-  console.log(`tool-center: ${toolCenter.list().length} tools registered (ccxt pending)`)
+  console.log(`tool-center: ${toolCenter.list().length} tools registered`)
 
   // ==================== AI Provider Chain ====================
 
@@ -329,8 +325,7 @@ async function main() {
         })
         accountManager.addAccount(newAccount)
         accountSetups.set(newAccount.id, { setup, gitFilePath: SEC_GIT_FILE })
-        registerAccountTools(setup, `trading-${newAccount.id}`)
-        console.log(`reconnect: ${newAccount.label} online (${toolCenter.list().length} tools)`)
+        console.log(`reconnect: ${newAccount.label} online`)
         return { success: true, message: `${newAccount.label} reconnected` }
       } else {
         // CCXT
@@ -347,8 +342,7 @@ async function main() {
         })
         accountManager.addAccount(newAccount)
         accountSetups.set(newAccount.id, { setup, gitFilePath: CRYPTO_GIT_FILE })
-        registerAccountTools(setup, `trading-${newAccount.id}`)
-        console.log(`reconnect: ${newAccount.label} online (${toolCenter.list().length} tools)`)
+        console.log(`reconnect: ${newAccount.label} online`)
         return { success: true, message: `${newAccount.label} reconnected` }
       }
     } catch (err) {
@@ -458,12 +452,14 @@ async function main() {
     console.log(`plugin started: ${plugin.name}`)
   }
 
-  console.log('engine: started (ccxt trading tools pending init)')
+  console.log('engine: started')
 
   // ==================== CCXT Background Injection ====================
   // When the CCXT account is ready, wire up TradingGit + register tools so the next
   // agent call picks them up automatically (VercelAIProvider re-checks tool count).
 
+  // When CCXT finishes async init, just register it with AccountManager.
+  // Trading tools already exist and will discover accounts dynamically via source routing.
   ccxtInitPromise.then(async (readyAccount) => {
     if (!readyAccount) return
     const savedState = await loadGitState(CRYPTO_GIT_FILE)
@@ -474,8 +470,7 @@ async function main() {
     })
     accountManager.addAccount(readyAccount)
     accountSetups.set(readyAccount.id, { setup, gitFilePath: CRYPTO_GIT_FILE })
-    registerAccountTools(setup, `trading-${readyAccount.id}`)
-    console.log(`ccxt: ${readyAccount.label} online (${toolCenter.list().length} tools total)`)
+    console.log(`ccxt: ${readyAccount.label} online`)
   })
 
   // ==================== Shutdown ====================
