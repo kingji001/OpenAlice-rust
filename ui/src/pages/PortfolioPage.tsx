@@ -214,9 +214,38 @@ interface PositionWithAccount extends Position {
   accountProvider: string
 }
 
-function PositionsTable({ positions }: { positions: PositionWithAccount[] }) {
-  const hasLeverage = positions.some(p => p.leverage > 1)
+/** True when the position carries derivative-specific context worth showing (side/leverage). */
+function isDerivative(p: Position): boolean {
+  const t = p.contract.secType
+  if (t === 'FUT' || t === 'OPT' || t === 'FOP') return true
+  if (t === 'CRYPTO' && p.leverage > 1) return true
+  return p.side === 'short'
+}
 
+/** Build display fragments for a contract based on its secType. */
+function contractDisplay(p: Position): { name: string; tag?: string } {
+  const c = p.contract
+  const sym = c.symbol ?? '???'
+  const t = c.secType
+
+  if (t === 'OPT' || t === 'FOP') {
+    // Options: show localSymbol if available, else construct from parts
+    const optDesc = c.localSymbol
+      ?? [sym, c.lastTradeDateOrContractMonth, c.right, c.strike && fmt(c.strike)].filter(Boolean).join(' ')
+    return { name: optDesc, tag: 'opt' }
+  }
+  if (t === 'FUT') {
+    const expiry = c.lastTradeDateOrContractMonth
+    return { name: expiry ? `${sym} ${expiry}` : sym, tag: 'fut' }
+  }
+  if (t === 'CRYPTO') {
+    return { name: sym, tag: p.leverage > 1 ? 'swap' : 'spot' }
+  }
+  // STK, CASH, BOND, CMDTY, etc. — just the symbol, no tag
+  return { name: sym }
+}
+
+function PositionsTable({ positions }: { positions: PositionWithAccount[] }) {
   return (
     <div>
       <h3 className="text-[13px] font-semibold text-text-muted uppercase tracking-wide mb-3">
@@ -227,41 +256,61 @@ function PositionsTable({ positions }: { positions: PositionWithAccount[] }) {
           <thead>
             <tr className="bg-bg-secondary text-text-muted text-left">
               <th className="px-3 py-2 font-medium">Symbol</th>
-              <th className="px-3 py-2 font-medium">Side</th>
               <th className="px-3 py-2 font-medium text-right">Qty</th>
-              <th className="px-3 py-2 font-medium text-right">Entry</th>
+              <th className="px-3 py-2 font-medium text-right">Avg Cost</th>
               <th className="px-3 py-2 font-medium text-right">Current</th>
-              {hasLeverage && <th className="px-3 py-2 font-medium text-right">Lev</th>}
-              <th className="px-3 py-2 font-medium text-right">Cost Basis</th>
               <th className="px-3 py-2 font-medium text-right">Mkt Value</th>
               <th className="px-3 py-2 font-medium text-right">PnL</th>
               <th className="px-3 py-2 font-medium text-right">PnL %</th>
             </tr>
           </thead>
           <tbody>
-            {positions.map((p, i) => (
-              <tr key={i} className="border-t border-border hover:bg-bg-tertiary/30 transition-colors">
-                <td className="px-3 py-2 font-medium text-text">
-                  {p.contract.symbol}
-                  <span className="text-[10px] text-text-muted ml-1.5">{p.accountLabel}</span>
-                </td>
-                <td className="px-3 py-2">
-                  <span className={p.side === 'long' ? 'text-green' : 'text-red'}>{p.side}</span>
-                </td>
-                <td className="px-3 py-2 text-right text-text">{fmtNum(p.qty)}</td>
-                <td className="px-3 py-2 text-right text-text-muted">{fmt(p.avgEntryPrice)}</td>
-                <td className="px-3 py-2 text-right text-text">{fmt(p.currentPrice)}</td>
-                {hasLeverage && <td className="px-3 py-2 text-right text-text-muted">{p.leverage}x</td>}
-                <td className="px-3 py-2 text-right text-text-muted">{fmt(p.costBasis)}</td>
-                <td className="px-3 py-2 text-right text-text">{fmt(p.marketValue)}</td>
-                <td className={`px-3 py-2 text-right font-medium ${p.unrealizedPnL >= 0 ? 'text-green' : 'text-red'}`}>
-                  {fmtPnl(p.unrealizedPnL)}
-                </td>
-                <td className={`px-3 py-2 text-right ${p.unrealizedPnLPercent >= 0 ? 'text-green' : 'text-red'}`}>
-                  {p.unrealizedPnLPercent >= 0 ? '+' : ''}{p.unrealizedPnLPercent.toFixed(2)}%
-                </td>
-              </tr>
-            ))}
+            {positions.map((p, i) => {
+              const display = contractDisplay(p)
+              const deriv = isDerivative(p)
+              const hasMarginInfo = p.margin || p.liquidationPrice
+
+              return (
+                <tr key={i} className="border-t border-border hover:bg-bg-tertiary/30 transition-colors">
+                  <td className="px-3 py-2">
+                    {/* Primary: symbol + inline badges */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-medium text-text">{display.name}</span>
+                      {display.tag && (
+                        <span className="text-[10px] px-1 py-0.5 rounded bg-bg-tertiary text-text-muted">{display.tag}</span>
+                      )}
+                      {deriv && (
+                        <span className={`text-[10px] px-1 py-0.5 rounded font-medium ${p.side === 'long' ? 'bg-green/15 text-green' : 'bg-red/15 text-red'}`}>
+                          {p.side}
+                        </span>
+                      )}
+                      {p.leverage > 1 && (
+                        <span className="text-[10px] px-1 py-0.5 rounded bg-accent/15 text-accent font-medium">{p.leverage}x</span>
+                      )}
+                      <span className="text-[10px] text-text-muted/50">{p.accountLabel}</span>
+                    </div>
+                    {/* Secondary: margin / liquidation for derivatives */}
+                    {hasMarginInfo && (
+                      <div className="text-[11px] text-text-muted mt-0.5">
+                        {p.margin ? `Margin ${fmt(p.margin)}` : ''}
+                        {p.margin && p.liquidationPrice ? ' \u00b7 ' : ''}
+                        {p.liquidationPrice ? `Liq ${fmt(p.liquidationPrice)}` : ''}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-right text-text">{fmtNum(p.qty)}</td>
+                  <td className="px-3 py-2 text-right text-text-muted">{fmt(p.avgEntryPrice)}</td>
+                  <td className="px-3 py-2 text-right text-text">{fmt(p.currentPrice)}</td>
+                  <td className="px-3 py-2 text-right text-text">{fmt(p.marketValue)}</td>
+                  <td className={`px-3 py-2 text-right font-medium ${p.unrealizedPnL >= 0 ? 'text-green' : 'text-red'}`}>
+                    {fmtPnl(p.unrealizedPnL)}
+                  </td>
+                  <td className={`px-3 py-2 text-right ${p.unrealizedPnLPercent >= 0 ? 'text-green' : 'text-red'}`}>
+                    {p.unrealizedPnLPercent >= 0 ? '+' : ''}{p.unrealizedPnLPercent.toFixed(2)}%
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

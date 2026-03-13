@@ -162,7 +162,18 @@ export interface AccountInfo {
 }
 
 export interface Position {
-  contract: { aliceId?: string; symbol?: string; secType?: string; exchange?: string; currency?: string }
+  contract: {
+    aliceId?: string
+    symbol?: string
+    secType?: string
+    exchange?: string
+    currency?: string
+    lastTradeDateOrContractMonth?: string
+    strike?: number
+    right?: string
+    multiplier?: number
+    localSymbol?: string
+  }
   side: 'long' | 'short'
   qty: number
   avgEntryPrice: number
