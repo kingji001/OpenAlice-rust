@@ -120,6 +120,21 @@ export function createTradingRoutes(ctx: EngineContext) {
     return c.json(uta.status())
   })
 
+  // Reject (records a user-rejected commit, clears staging)
+  app.post('/accounts/:id/wallet/reject', async (c) => {
+    const uta = ctx.accountManager.get(c.req.param('id'))
+    if (!uta) return c.json({ error: 'Account not found' }, 404)
+    if (!uta.status().pendingMessage) return c.json({ error: 'Nothing to reject' }, 400)
+    try {
+      const body = await c.req.json().catch(() => ({}))
+      const reason = typeof body.reason === 'string' ? body.reason : undefined
+      const result = await uta.reject(reason)
+      return c.json(result)
+    } catch (err) {
+      return c.json({ error: String(err) }, 500)
+    }
+  })
+
   // Push (manual approval — the AI tool is hollowed out, only humans can push)
   app.post('/accounts/:id/wallet/push', async (c) => {
     const uta = ctx.accountManager.get(c.req.param('id'))

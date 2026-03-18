@@ -11,6 +11,7 @@ import type {
   AddResult,
   CommitPrepareResult,
   PushResult,
+  RejectResult,
   GitStatus,
   GitCommit,
   CommitLogEntry,
@@ -28,6 +29,7 @@ export interface ITradingGit {
   add(operation: Operation): AddResult
   commit(message: string): CommitPrepareResult
   push(): Promise<PushResult>
+  reject(reason?: string): Promise<RejectResult>
 
   // ---- git log / show / status ----
 

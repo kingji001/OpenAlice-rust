@@ -14,6 +14,7 @@ import type {
   AddResult,
   CommitPrepareResult,
   PushResult,
+  RejectResult,
   GitStatus,
   GitCommit,
   GitState,
@@ -138,6 +139,50 @@ export class TradingGit implements ITradingGit {
     return { hash, message, operationCount: operations.length, submitted, rejected }
   }
 
+  async reject(reason?: string): Promise<RejectResult> {
+    if (this.stagingArea.length === 0) {
+      throw new Error('Nothing to reject: staging area is empty')
+    }
+    if (this.pendingMessage === null || this.pendingHash === null) {
+      throw new Error('Nothing to reject: please commit first')
+    }
+
+    const operations = [...this.stagingArea]
+    const message = `[rejected] ${this.pendingMessage}${reason ? ` — ${reason}` : ''}`
+    const hash = this.pendingHash
+
+    const results: OperationResult[] = operations.map((op) => ({
+      action: op.action,
+      success: false,
+      status: 'user-rejected' as const,
+      error: reason || 'Rejected by user',
+    }))
+
+    const stateAfter = await this.config.getGitState()
+
+    const commit: GitCommit = {
+      hash,
+      parentHash: this.head,
+      message,
+      operations,
+      results,
+      stateAfter,
+      timestamp: new Date().toISOString(),
+      round: this.currentRound,
+    }
+
+    this.commits.push(commit)
+    this.head = hash
+    await this.config.onCommit?.(this.exportState())
+
+    // Clear staging
+    this.stagingArea = []
+    this.pendingMessage = null
+    this.pendingHash = null
+
+    return { hash, message, operationCount: operations.length }
+  }
+
   // ==================== git log / show / status ====================
 
   log(options: { limit?: number; symbol?: string } = {}): CommitLogEntry[] {
@@ -197,6 +242,9 @@ export class TradingGit implements ITradingGit {
         const hasCash = cashQty !== UNSET_DOUBLE && cashQty > 0
         const sizeStr = hasCash ? `$${cashQty}` : hasQty ? `${qty}` : '?'
 
+        if (result?.status === 'user-rejected') {
+          return `${side} ${sizeStr} (user-rejected)`
+        }
         if (result?.status === 'filled') {
           const price = result.execution?.price ? ` @${result.execution.price}` : ''
           return `${side} ${sizeStr}${price}`

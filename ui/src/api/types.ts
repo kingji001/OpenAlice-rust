@@ -216,6 +216,12 @@ export interface WalletStatus {
   commitCount: number
 }
 
+export interface WalletRejectResult {
+  hash: string
+  message: string
+  operationCount: number
+}
+
 export interface WalletPushResult {
   hash: string
   message: string

@@ -1,59 +1,123 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api'
-import type { TradingAccount, WalletStatus, WalletPushResult } from '../api/types'
+import type { TradingAccount, WalletStatus, WalletPushResult, WalletCommitLog } from '../api/types'
+
+// ==================== Types ====================
 
 interface PendingAccount {
   account: TradingAccount
   status: WalletStatus
 }
 
-/** Format an operation for display. */
-function formatOp(op: WalletStatus['staged'][number]): string {
-  const symbol = op.contract?.aliceId || op.contract?.symbol || op.contract?.localSymbol || ''
+interface AccountHistory {
+  accountId: string
+  label: string
+  commits: WalletCommitLog[]
+}
+
+// ==================== Helpers ====================
+
+/** Extract symbol from operation. */
+function opSymbol(op: WalletStatus['staged'][number]): string {
+  const raw = op.contract?.aliceId || op.contract?.symbol || op.contract?.localSymbol || ''
+  // Strip "accountId|" prefix from aliceId
+  const sep = raw.indexOf('|')
+  return sep !== -1 ? raw.slice(sep + 1) : raw
+}
+
+/** Format operation for display — returns { text, isBuy } */
+function formatOp(op: WalletStatus['staged'][number]): { text: string; side?: 'buy' | 'sell' } {
+  const symbol = opSymbol(op)
   switch (op.action) {
     case 'placeOrder': {
-      const side = op.order?.action || '?'
-      const type = op.order?.orderType || ''
+      const sideRaw = (op.order?.action || '').toUpperCase()
+      const isBuy = sideRaw === 'BUY'
+      const type = (op.order?.orderType || '').toUpperCase()
+      const typeBadge = type === 'MKT' || type === 'MARKET' ? 'MKT' : type === 'LMT' || type === 'LIMIT' ? 'LMT' : type
       const qty = op.order?.totalQuantity ?? op.order?.cashQty ?? ''
+      const qtyStr = typeof qty === 'number' ? qty.toLocaleString() : String(qty)
       const price = op.order?.lmtPrice ? ` @ ${op.order.lmtPrice}` : ''
-      return `${side} ${qty} ${symbol} ${type}${price}`.trim()
+      return {
+        text: `${sideRaw} ${qtyStr} ${symbol} ${typeBadge}${price}`.trim(),
+        side: isBuy ? 'buy' : 'sell',
+      }
     }
     case 'closePosition':
-      return `Close ${symbol}${op.quantity ? ` (${op.quantity})` : ''}`
+      return { text: `CLOSE ${symbol}${op.quantity ? ` (${op.quantity})` : ''}`, side: 'sell' }
     case 'modifyOrder':
-      return `Modify order ${op.orderId || '?'}`
+      return { text: `MODIFY ${op.orderId || '?'}` }
     case 'cancelOrder':
-      return `Cancel order ${op.orderId || '?'}`
+      return { text: `CANCEL ${op.orderId || '?'}` }
     case 'syncOrders':
-      return 'Sync orders'
+      return { text: 'SYNC' }
     default:
-      return op.action
+      return { text: op.action }
   }
 }
 
+/** Relative time string. */
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
+/** Status badge color. */
+function statusColor(status: string): string {
+  switch (status) {
+    case 'submitted': return 'text-blue-400'
+    case 'filled': return 'text-green-400'
+    case 'rejected': return 'text-red-400'
+    case 'user-rejected': return 'text-orange-400'
+    case 'cancelled': return 'text-text-muted'
+    default: return 'text-text-muted'
+  }
+}
+
+// ==================== Component ====================
+
 export function PushApprovalPanel() {
+  const [accounts, setAccounts] = useState<TradingAccount[]>([])
   const [pending, setPending] = useState<PendingAccount[]>([])
+  const [history, setHistory] = useState<AccountHistory[]>([])
   const [pushing, setPushing] = useState<string | null>(null)
-  const [result, setResult] = useState<{ accountId: string; data: WalletPushResult } | null>(null)
+  const [rejecting, setRejecting] = useState<string | null>(null)
+  const [confirmingPush, setConfirmingPush] = useState<string | null>(null)
+  const [lastResult, setLastResult] = useState<{ accountId: string; data: WalletPushResult } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const poll = useCallback(async () => {
     try {
-      const { accounts } = await api.trading.listAccounts()
-      const results: PendingAccount[] = []
-      for (const account of accounts) {
+      const { accounts: accts } = await api.trading.listAccounts()
+      setAccounts(accts)
+
+      const pendingResults: PendingAccount[] = []
+      const historyResults: AccountHistory[] = []
+
+      for (const account of accts) {
         try {
-          const status = await api.trading.walletStatus(account.id)
+          const [status, { commits }] = await Promise.all([
+            api.trading.walletStatus(account.id),
+            api.trading.walletLog(account.id, 10),
+          ])
           if (status.pendingMessage) {
-            results.push({ account, status })
+            pendingResults.push({ account, status })
           }
-        } catch { /* skip unreachable accounts */ }
+          if (commits.length > 0) {
+            historyResults.push({ accountId: account.id, label: account.label || account.id, commits })
+          }
+        } catch { /* skip unreachable */ }
       }
-      setPending(results)
+
+      setPending(pendingResults)
+      setHistory(historyResults)
     } catch { /* ignore */ }
   }, [])
 
-  // Poll every 3 seconds
   useEffect(() => {
     poll()
     const id = setInterval(poll, 3000)
@@ -62,12 +126,12 @@ export function PushApprovalPanel() {
 
   const handlePush = useCallback(async (accountId: string) => {
     setPushing(accountId)
+    setConfirmingPush(null)
     setError(null)
-    setResult(null)
+    setLastResult(null)
     try {
       const data = await api.trading.walletPush(accountId)
-      setResult({ accountId, data })
-      // Refresh pending list
+      setLastResult({ accountId, data })
       await poll()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Push failed')
@@ -76,78 +140,179 @@ export function PushApprovalPanel() {
     }
   }, [poll])
 
-  // Nothing pending and no recent result — hide panel
-  if (pending.length === 0 && !result) return null
+  const handleReject = useCallback(async (accountId: string) => {
+    setRejecting(accountId)
+    setError(null)
+    try {
+      await api.trading.walletReject(accountId)
+      await poll()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Reject failed')
+    } finally {
+      setRejecting(null)
+    }
+  }, [poll])
+
+  // No trading accounts configured — hide panel entirely
+  if (accounts.length === 0) return null
+
+  const hasPending = pending.length > 0
+  const hasHistory = history.length > 0
 
   return (
     <div className="w-72 shrink-0 border-l border-border bg-bg-secondary/30 flex flex-col min-h-0">
-      <div className="px-4 py-3 border-b border-border">
-        <h3 className="text-sm font-semibold text-text">Pending Push</h3>
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted">
+          <path d="M12 20V10M18 20V4M6 20v-4" />
+        </svg>
+        <h3 className="text-sm font-semibold text-text">Trading</h3>
+        {hasPending && (
+          <span className="ml-auto w-2 h-2 rounded-full bg-accent animate-pulse" title="Pending operations" />
+        )}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-        {pending.map(({ account, status }) => (
-          <div key={account.id} className="space-y-2">
-            <div className="text-xs text-text-muted font-medium">{account.label || account.id}</div>
-
-            {/* Commit message */}
-            <div className="text-sm text-text font-medium px-2 py-1.5 rounded bg-bg-secondary border border-border">
-              {status.pendingMessage}
-            </div>
-
-            {/* Operations */}
-            <div className="space-y-1">
-              {status.staged.map((op, i) => (
-                <div key={i} className="text-xs text-text-muted px-2 py-1 rounded bg-bg/50">
-                  {formatOp(op)}
+      <div className="flex-1 overflow-y-auto">
+        {/* ==================== Pending Section ==================== */}
+        {hasPending ? (
+          <div className="px-3 py-3 space-y-3">
+            {pending.map(({ account, status }) => (
+              <div key={account.id} className="space-y-2">
+                <div className="text-[11px] text-text-muted font-medium uppercase tracking-wider">
+                  {account.label || account.id}
                 </div>
-              ))}
-            </div>
 
-            {/* Actions */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => handlePush(account.id)}
-                disabled={pushing !== null}
-                className="flex-1 text-xs px-3 py-1.5 rounded font-medium bg-accent text-white hover:bg-accent/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {pushing === account.id ? 'Pushing...' : 'Approve & Push'}
-              </button>
-            </div>
-          </div>
-        ))}
+                {/* Commit message */}
+                <div className="text-xs text-text font-medium px-2 py-1.5 rounded bg-bg-secondary border border-border">
+                  {status.pendingMessage}
+                </div>
 
-        {/* Result feedback */}
-        {result && (
-          <div className="space-y-1 pt-2 border-t border-border">
-            <div className="text-xs font-medium text-text-muted">Last push</div>
-            <div className="text-xs text-text">
-              {result.data.submitted.length > 0 && (
-                <span className="text-green-400">{result.data.submitted.length} submitted</span>
-              )}
-              {result.data.rejected.length > 0 && (
-                <>
-                  {result.data.submitted.length > 0 && ', '}
-                  <span className="text-red-400">{result.data.rejected.length} rejected</span>
-                </>
-              )}
-            </div>
-            {result.data.rejected.map((r, i) => (
-              <div key={i} className="text-xs text-red-400/80 px-2">{r.error || 'Unknown error'}</div>
+                {/* Staged operations */}
+                <div className="space-y-0.5">
+                  {status.staged.map((op, i) => {
+                    const { text, side } = formatOp(op)
+                    return (
+                      <div
+                        key={i}
+                        className={`text-xs font-mono px-2 py-1 rounded bg-bg/50 ${
+                          side === 'buy' ? 'text-green-400' : side === 'sell' ? 'text-red-400' : 'text-text-muted'
+                        }`}
+                      >
+                        {text}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Inline confirm or action buttons */}
+                {confirmingPush === account.id ? (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-text-muted">Execute {status.staged.length} op{status.staged.length > 1 ? 's' : ''}?</span>
+                    <button
+                      onClick={() => handlePush(account.id)}
+                      disabled={pushing !== null}
+                      className="px-2 py-1 rounded font-medium bg-accent text-white hover:bg-accent/80 disabled:opacity-50 transition-colors"
+                    >
+                      {pushing === account.id ? '...' : 'Confirm'}
+                    </button>
+                    <button
+                      onClick={() => setConfirmingPush(null)}
+                      className="px-2 py-1 rounded text-text-muted hover:text-text transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setConfirmingPush(account.id)}
+                      disabled={pushing !== null || rejecting !== null}
+                      className="flex-1 text-xs px-3 py-1.5 rounded font-medium bg-accent text-white hover:bg-accent/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Approve & Push
+                    </button>
+                    <button
+                      onClick={() => handleReject(account.id)}
+                      disabled={pushing !== null || rejecting !== null}
+                      className="text-xs px-3 py-1.5 rounded font-medium border border-border text-text-muted hover:text-red-400 hover:border-red-400/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {rejecting === account.id ? '...' : 'Reject'}
+                    </button>
+                  </div>
+                )}
+              </div>
             ))}
-            <button
-              onClick={() => setResult(null)}
-              className="text-xs text-text-muted hover:text-text mt-1"
-            >
-              Dismiss
-            </button>
+
+            {/* Last push result feedback */}
+            {lastResult && (
+              <div className="space-y-1 pt-2 border-t border-border">
+                <div className="text-[11px] font-medium text-text-muted uppercase tracking-wider">Last push</div>
+                <div className="text-xs text-text">
+                  {lastResult.data.submitted.length > 0 && (
+                    <span className="text-green-400">{lastResult.data.submitted.length} submitted</span>
+                  )}
+                  {lastResult.data.rejected.length > 0 && (
+                    <>
+                      {lastResult.data.submitted.length > 0 && ', '}
+                      <span className="text-red-400">{lastResult.data.rejected.length} rejected</span>
+                    </>
+                  )}
+                </div>
+                {lastResult.data.rejected.map((r, i) => (
+                  <div key={i} className="text-xs text-red-400/80 px-2">{r.error || 'Unknown error'}</div>
+                ))}
+                <button onClick={() => setLastResult(null)} className="text-[11px] text-text-muted hover:text-text">
+                  Dismiss
+                </button>
+              </div>
+            )}
+
+            {error && (
+              <div className="text-xs text-red-400 pt-2 border-t border-border">
+                {error}
+                <button onClick={() => setError(null)} className="ml-2 text-text-muted hover:text-text">Dismiss</button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="px-3 py-4 text-xs text-text-muted text-center">
+            No pending operations
           </div>
         )}
 
-        {error && (
-          <div className="text-xs text-red-400 pt-2 border-t border-border">
-            {error}
-            <button onClick={() => setError(null)} className="ml-2 text-text-muted hover:text-text">Dismiss</button>
+        {/* ==================== History Section ==================== */}
+        {hasHistory && (
+          <div className="border-t border-border">
+            <div className="px-3 py-2">
+              <div className="text-[11px] text-text-muted font-medium uppercase tracking-wider">History</div>
+            </div>
+            <div className="px-3 pb-3 space-y-3">
+              {history.map(({ accountId, label, commits }) => (
+                <div key={accountId} className="space-y-1">
+                  {history.length > 1 && (
+                    <div className="text-[10px] text-text-muted/60 font-medium uppercase tracking-wider">{label}</div>
+                  )}
+                  {commits.map((commit) => (
+                    <div key={commit.hash} className="group px-2 py-1.5 rounded hover:bg-bg-secondary/50 transition-colors">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono text-text-muted/50">{commit.hash}</span>
+                        <span className="text-[10px] text-text-muted/40">{timeAgo(commit.timestamp)}</span>
+                      </div>
+                      <div className="text-xs text-text mt-0.5 leading-snug">{commit.message}</div>
+                      {commit.operations.length > 0 && (
+                        <div className="flex flex-wrap gap-x-2 mt-0.5">
+                          {commit.operations.map((op, i) => (
+                            <span key={i} className={`text-[10px] ${statusColor(op.status)}`}>
+                              {op.symbol !== 'unknown' ? op.symbol : op.action} · {op.status}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

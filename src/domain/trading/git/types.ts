@@ -28,7 +28,7 @@ export type Operation =
 
 // ==================== Operation Result ====================
 
-export type OperationStatus = 'submitted' | 'filled' | 'rejected' | 'cancelled'
+export type OperationStatus = 'submitted' | 'filled' | 'rejected' | 'cancelled' | 'user-rejected'
 
 export interface OperationResult {
   action: OperationAction
@@ -87,6 +87,12 @@ export interface PushResult {
   operationCount: number
   submitted: OperationResult[]
   rejected: OperationResult[]
+}
+
+export interface RejectResult {
+  hash: CommitHash
+  message: string
+  operationCount: number
 }
 
 export interface GitStatus {

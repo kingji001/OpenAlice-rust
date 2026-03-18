@@ -16,6 +16,7 @@ import type {
   AddResult,
   CommitPrepareResult,
   PushResult,
+  RejectResult,
   GitStatus,
   GitCommit,
   GitState,
@@ -253,6 +254,10 @@ export class UnifiedTradingAccount {
 
   push(): Promise<PushResult> {
     return this.git.push()
+  }
+
+  reject(reason?: string): Promise<RejectResult> {
+    return this.git.reject(reason)
   }
 
   // ==================== Git queries ====================

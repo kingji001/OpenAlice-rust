@@ -9,6 +9,7 @@ export type {
   AddResult,
   CommitPrepareResult,
   PushResult,
+  RejectResult,
   GitStatus,
   GitCommit,
   GitState,
