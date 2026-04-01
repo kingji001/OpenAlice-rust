@@ -265,7 +265,15 @@ IMPORTANT: Check this BEFORE making new trading decisions.`,
     placeOrder: tool({
       description: `Stage an order (will execute on tradingPush).
 BEFORE placing orders: check tradingLog, getPortfolio, verify strategy alignment.
-NOTE: This stages the operation. Call tradingCommit + tradingPush to execute.`,
+NOTE: This stages the operation. Call tradingCommit + tradingPush to execute.
+Required params by orderType:
+  MKT: totalQuantity (or cashQty)
+  LMT: totalQuantity + lmtPrice
+  STP: totalQuantity + auxPrice (stop trigger)
+  STP LMT: totalQuantity + auxPrice (stop trigger) + lmtPrice
+  TRAIL: totalQuantity + auxPrice (trailing offset) or trailingPercent
+  TRAIL LIMIT: totalQuantity + auxPrice (trailing offset) + lmtPrice
+  MOC: totalQuantity`,
       inputSchema: z.object({
         source: z.string().describe(sourceDesc(true)),
         aliceId: z.string().describe('Contract ID (format: accountId|nativeKey, from searchContracts)'),
