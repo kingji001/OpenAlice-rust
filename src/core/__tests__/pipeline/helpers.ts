@@ -6,9 +6,16 @@
  * imported from their respective modules (MemorySessionStore, MockConnector).
  */
 
+import { vi } from 'vitest'
 import { AgentCenter } from '../../agent-center.js'
 import { GenerateRouter, StreamableResult, type ProviderEvent } from '../../ai-provider-manager.js'
 import { DEFAULT_COMPACTION_CONFIG } from '../../compaction.js'
+
+// Mock resolveProfile so GenerateRouter.resolve() works without disk I/O
+vi.mock('../../config.js', () => ({
+  resolveProfile: vi.fn().mockResolvedValue({ backend: 'vercel-ai-sdk', label: 'Test', model: 'mock', provider: 'anthropic' }),
+  readAgentConfig: vi.fn().mockResolvedValue({ maxSteps: 20, evolutionMode: false, claudeCode: { disallowedTools: [], maxTurns: 20 } }),
+}))
 
 // Re-export test doubles for convenience
 export { MemorySessionStore } from '../../session.js'

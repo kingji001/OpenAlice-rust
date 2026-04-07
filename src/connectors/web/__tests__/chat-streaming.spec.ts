@@ -25,6 +25,11 @@ import type { SSEClient } from '../routes/chat.js'
 
 // ==================== Module Mocks ====================
 
+vi.mock('../../../core/config.js', () => ({
+  resolveProfile: vi.fn().mockResolvedValue({ backend: 'vercel-ai-sdk', label: 'Test', model: 'mock', provider: 'anthropic' }),
+  readAgentConfig: vi.fn().mockResolvedValue({ maxSteps: 20, evolutionMode: false, claudeCode: { disallowedTools: [], maxTurns: 20 } }),
+}))
+
 vi.mock('../../../core/compaction.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../core/compaction.js')>()
   return {

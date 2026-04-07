@@ -6,7 +6,8 @@
  * core infrastructure that orchestrates providers.
  */
 
-import { readAIProviderConfig } from './config.js'
+import { resolveProfile } from './config.js'
+import type { ResolvedProfile } from './config.js'
 import type { ProviderEvent, ProviderResult, AIProvider } from '../ai-providers/types.js'
 
 export type {
@@ -81,92 +82,45 @@ export class StreamableResult implements PromiseLike<ProviderResult>, AsyncItera
 // ==================== Types ====================
 
 export interface AskOptions {
-  /**
-   * Preamble text describing the conversation context.
-   * Claude Code: injected inside the `<chat_history>` text block.
-   * Vercel AI SDK: not used (native ModelMessage[] carries the history directly).
-   */
+  /** Preamble text describing the conversation context. */
   historyPreamble?: string
-  /**
-   * System prompt override for this call.
-   * Claude Code: passed as `--system-prompt` to the CLI.
-   * Vercel AI SDK: replaces the agent's `instructions` for this call (triggers agent re-creation if changed).
-   */
+  /** System prompt override for this call. */
   systemPrompt?: string
-  /**
-   * Max text history entries to include in context.
-   * Claude Code: limits entries in the `<chat_history>` block. Default: 50.
-   * Vercel AI SDK: not used (compaction via `compactIfNeeded` controls context size).
-   */
+  /** Max text history entries to include in context (text providers only). */
   maxHistoryEntries?: number
-  /**
-   * Tool names to disable for this call, in addition to the global disabled list.
-   * Claude Code: merged into `disallowedTools` CLI option.
-   * Vercel AI SDK: filtered out from the tool map before the agent is created.
-   */
+  /** Tool names to disable for this call. */
   disabledTools?: string[]
-  /**
-   * AI provider to use for this call, overriding the global ai-provider-manager.json config.
-   * Falls back to global config if not specified.
-   */
-  provider?: 'claude-code' | 'vercel-ai-sdk' | 'agent-sdk' | 'codex'
-  /**
-   * Vercel AI SDK model override — per-request provider/model/baseUrl/apiKey.
-   * Only used when the active backend is 'vercel-ai-sdk'.
-   */
-  vercelAiSdk?: {
-    provider: string
-    model: string
-    baseUrl?: string
-    apiKey?: string
-  }
-  /**
-   * Agent SDK model override — per-request model/apiKey/baseUrl.
-   * Only used when the active backend is 'agent-sdk'.
-   */
-  agentSdk?: {
-    model?: string
-    apiKey?: string
-    baseUrl?: string
-  }
-  /**
-   * Codex model override — per-request model/baseUrl.
-   * Only used when the active backend is 'codex'.
-   */
-  codex?: {
-    model?: string
-    baseUrl?: string
-    apiKey?: string
-    loginMethod?: 'api-key' | 'codex-oauth'
-  }
+  /** Profile slug override. Falls back to global activeProfile if omitted. */
+  profileSlug?: string
 }
 
 // ==================== GenerateRouter ====================
 
-/** Reads runtime AI config and resolves to the correct AIProvider. */
+/** Resolves profile → AIProvider instance + resolved config. */
 export class GenerateRouter {
+  private providers: Record<string, AIProvider>
+
   constructor(
-    private vercel: AIProvider,
-    private agentSdk: AIProvider | null = null,
-    private codex: AIProvider | null = null,
-  ) {}
-
-  /** Resolve the active provider, optionally overridden per-request. */
-  async resolve(override?: string): Promise<AIProvider> {
-    if (override === 'codex' && this.codex) return this.codex
-    // 'claude-code' is a legacy alias for 'agent-sdk'
-    if ((override === 'agent-sdk' || override === 'claude-code') && this.agentSdk) return this.agentSdk
-    if (override === 'vercel-ai-sdk') return this.vercel
-
-    const config = await readAIProviderConfig()
-    if (config.backend === 'codex' && this.codex) return this.codex
-    if ((config.backend === 'agent-sdk' || config.backend === 'claude-code') && this.agentSdk) return this.agentSdk
-    return this.vercel
+    vercel: AIProvider,
+    agentSdk: AIProvider | null = null,
+    codex: AIProvider | null = null,
+  ) {
+    this.providers = { 'vercel-ai-sdk': vercel }
+    if (agentSdk) this.providers['agent-sdk'] = agentSdk
+    if (codex) this.providers['codex'] = codex
   }
 
-  /** Stateless ask — delegates to the resolved provider. */
+  /** Resolve profile and pick the matching provider. */
+  async resolve(profileSlug?: string): Promise<{ provider: AIProvider; profile: ResolvedProfile }> {
+    const profile = await resolveProfile(profileSlug)
+    const provider = this.providers[profile.backend]
+    if (!provider) throw new Error(`No provider registered for backend: ${profile.backend}`)
+    return { provider, profile }
+  }
+
+  /** Stateless ask — delegates to the active profile's provider. */
   async ask(prompt: string): Promise<ProviderResult> {
-    const provider = await this.resolve()
+    const { provider } = await this.resolve()
     return provider.ask(prompt)
   }
 }

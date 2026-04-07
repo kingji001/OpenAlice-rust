@@ -2,7 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { VercelAIProvider } from './vercel-provider.js'
 
 vi.mock('./model-factory.js', () => ({
-  createModelFromConfig: vi.fn(),
+  createModelFromProfile: vi.fn(),
+}))
+
+vi.mock('../../core/config.js', () => ({
+  resolveProfile: vi.fn().mockResolvedValue({ backend: 'vercel-ai-sdk', label: 'Test', model: 'mock-model', provider: 'anthropic' }),
 }))
 
 vi.mock('./agent.js', () => ({
@@ -14,10 +18,10 @@ vi.mock('../../core/media.js', () => ({
   extractMediaFromToolOutput: vi.fn().mockReturnValue([]),
 }))
 
-import { createModelFromConfig } from './model-factory.js'
+import { createModelFromProfile } from './model-factory.js'
 import { generateText } from './agent.js'
 
-const mockCreateModelFromConfig = vi.mocked(createModelFromConfig)
+const mockCreateModelFromProfile = vi.mocked(createModelFromProfile)
 const mockGenerateText = vi.mocked(generateText)
 
 // ==================== Helpers ====================
@@ -32,7 +36,7 @@ function makeProvider(overrides?: { getTools?: () => Promise<Record<string, any>
 describe('VercelAIProvider — ask()', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockCreateModelFromConfig.mockResolvedValue({ model: {} as any, key: 'gpt-4o' })
+    mockCreateModelFromProfile.mockResolvedValue({ model: {} as any, key: 'gpt-4o' })
     mockGenerateText.mockResolvedValue({ text: 'ok', steps: [] } as any)
   })
 
@@ -68,7 +72,7 @@ describe('VercelAIProvider — ask()', () => {
 describe('VercelAIProvider — generate() tool filtering', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockCreateModelFromConfig.mockResolvedValue({ model: {} as any, key: 'gpt-4o' })
+    mockCreateModelFromProfile.mockResolvedValue({ model: {} as any, key: 'gpt-4o' })
     mockGenerateText.mockResolvedValue({ text: 'ok', steps: [] } as any)
   })
 
@@ -88,14 +92,15 @@ describe('VercelAIProvider — generate() tool filtering', () => {
     expect(toolNames).toContain('toolC')
   })
 
-  it('passes modelOverride to createModelFromConfig', async () => {
+  it('passes profile to createModelFromProfile', async () => {
     const provider = makeProvider()
+    const profile = { backend: 'vercel-ai-sdk' as const, label: 'Test', model: 'claude-3-7', provider: 'anthropic' }
 
-    for await (const _ of provider.generate([], 'test', { vercelAiSdk: { modelId: 'claude-3-7' } as any })) {
+    for await (const _ of provider.generate([], 'test', { profile })) {
       // drain
     }
 
-    expect(mockCreateModelFromConfig).toHaveBeenCalledWith({ modelId: 'claude-3-7' })
+    expect(mockCreateModelFromProfile).toHaveBeenCalledWith(profile)
   })
 })
 
@@ -104,7 +109,7 @@ describe('VercelAIProvider — generate() tool filtering', () => {
 describe('VercelAIProvider — generate() events', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockCreateModelFromConfig.mockResolvedValue({ model: {} as any, key: 'gpt-4o' })
+    mockCreateModelFromProfile.mockResolvedValue({ model: {} as any, key: 'gpt-4o' })
   })
 
   it('yields done event with text from result', async () => {

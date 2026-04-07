@@ -1,8 +1,7 @@
 /**
  * VercelAIProvider — GenerateProvider backed by Vercel AI SDK's generateText.
  *
- * The model is lazily created from config on each call. When ai-provider.json
- * changes on disk, the next request picks up the new model automatically.
+ * The model is lazily created from the resolved profile on each call.
  * Instructions (persona + brain state) are also re-read per request.
  */
 
@@ -10,9 +9,11 @@ import type { ModelMessage, Tool } from 'ai'
 import type { ProviderResult, ProviderEvent, AIProvider, GenerateOpts } from '../types.js'
 import type { SessionEntry } from '../../core/session.js'
 import type { MediaAttachment } from '../../core/types.js'
+import type { ResolvedProfile } from '../../core/config.js'
+import { resolveProfile } from '../../core/config.js'
 import { toModelMessages } from '../../core/session.js'
 import { extractMediaFromToolOutput } from '../../core/media.js'
-import { createModelFromConfig, type ModelOverride } from './model-factory.js'
+import { createModelFromProfile } from './model-factory.js'
 import { generateText, stepCountIs } from './agent.js'
 import { createChannel } from '../../core/async-channel.js'
 
@@ -26,9 +27,11 @@ export class VercelAIProvider implements AIProvider {
   ) {}
 
   /** Resolve model, tools, and instructions for a single request. */
-  private async resolve(disabledTools?: string[], modelOverride?: ModelOverride) {
+  private async resolve(disabledTools?: string[], profile?: ResolvedProfile) {
+    // If no profile provided (e.g. ask()), resolve the active one
+    const effectiveProfile = profile ?? await resolveProfile()
     const [{ model }, allTools, instructions] = await Promise.all([
-      createModelFromConfig(modelOverride),
+      createModelFromProfile(effectiveProfile),
       this.getTools(),
       this.getInstructions(),
     ])
@@ -61,7 +64,7 @@ export class VercelAIProvider implements AIProvider {
   }
 
   async *generate(entries: SessionEntry[], _prompt: string, opts?: GenerateOpts): AsyncGenerator<ProviderEvent> {
-    const { model, tools, instructions } = await this.resolve(opts?.disabledTools, opts?.vercelAiSdk)
+    const { model, tools, instructions } = await this.resolve(opts?.disabledTools, opts?.profile)
     const messages = toModelMessages(entries)
 
     const channel = createChannel<ProviderEvent>()

@@ -19,6 +19,11 @@ import {
 
 // ==================== Module Mocks ====================
 
+vi.mock('../../config.js', () => ({
+  resolveProfile: vi.fn().mockResolvedValue({ backend: 'vercel-ai-sdk', label: 'Test', model: 'mock', provider: 'anthropic' }),
+  readAgentConfig: vi.fn().mockResolvedValue({ maxSteps: 20, evolutionMode: false, claudeCode: { disallowedTools: [], maxTurns: 20 } }),
+}))
+
 vi.mock('../../compaction.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../compaction.js')>()
   return {

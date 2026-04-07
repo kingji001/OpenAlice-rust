@@ -73,8 +73,8 @@ export class AgentCenter {
     // 1. Append user message to session
     await session.appendUser(prompt, 'human')
 
-    // 2. Resolve provider (may be overridden per-request)
-    const provider = await this.router.resolve(opts?.provider)
+    // 2. Resolve provider + profile (may be overridden per-request via profileSlug)
+    const { provider, profile } = await this.router.resolve(opts?.profileSlug)
 
     // 3. Compact if needed (provider can override with custom strategy)
     const compactionResult = provider.compact
@@ -94,9 +94,7 @@ export class AgentCenter {
       historyPreamble: opts?.historyPreamble ?? this.defaultPreamble,
       maxHistoryEntries: opts?.maxHistoryEntries ?? this.defaultMaxHistory,
       disabledTools: opts?.disabledTools,
-      vercelAiSdk: opts?.vercelAiSdk,
-      agentSdk: opts?.agentSdk,
-      codex: opts?.codex,
+      profile,
     }
     const source = provider.generate(entries, prompt, genOpts)
 

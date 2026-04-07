@@ -10,7 +10,7 @@ import type { McpSdkServerConfigWithInstance } from '@anthropic-ai/claude-agent-
 import { pino } from 'pino'
 import type { ContentBlock } from '../../core/session.js'
 
-import { readAIProviderConfig } from '../../core/config.js'
+// Config is now resolved via profile system — override carries all needed values
 
 const logger = pino({
   transport: { target: 'pino/file', options: { destination: 'logs/agent-sdk.log', mkdir: true } },
@@ -117,9 +117,8 @@ export async function askAgentSdk(
   const finalAllowed = allowedTools.length > 0 ? allowedTools : modeAllowed
   const finalDisallowed = [...disallowedTools, ...modeDisallowed]
 
-  // Build env with authentication
-  const aiConfig = await readAIProviderConfig()
-  const loginMethod = override?.loginMethod ?? aiConfig.loginMethod ?? 'api-key'
+  // Build env with authentication — override carries resolved profile values
+  const loginMethod = override?.loginMethod ?? 'api-key'
   const isOAuthMode = loginMethod === 'claudeai'
 
   const env: Record<string, string | undefined> = { ...process.env }
@@ -127,10 +126,10 @@ export async function askAgentSdk(
     // Force OAuth by removing any inherited API key
     delete env.ANTHROPIC_API_KEY
   } else {
-    const apiKey = override?.apiKey ?? aiConfig.apiKeys.anthropic
+    const apiKey = override?.apiKey
     if (apiKey) env.ANTHROPIC_API_KEY = apiKey
   }
-  const baseUrl = override?.baseUrl ?? aiConfig.baseUrl
+  const baseUrl = override?.baseUrl
   if (baseUrl) env.ANTHROPIC_BASE_URL = baseUrl
 
   // MCP servers
@@ -149,7 +148,7 @@ export async function askAgentSdk(
       options: {
         cwd,
         env,
-        model: override?.model ?? aiConfig.model,
+        model: override?.model ?? 'claude-sonnet-4-6',
         maxTurns,
         allowedTools: finalAllowed,
         disallowedTools: finalDisallowed,

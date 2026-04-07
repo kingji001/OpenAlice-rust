@@ -10,18 +10,16 @@ import { askAgentSdk } from '../../ai-providers/agent-sdk/query.js'
 import type { AgentSdkConfig } from '../../ai-providers/agent-sdk/query.js'
 import { SessionStore } from '../../core/session'
 import { forceCompact } from '../../core/compaction'
-import { readAIBackend, writeAIBackend, readConnectorsConfig, type AIBackend } from '../../core/config'
+import { readAIProviderConfig, setActiveProfile, readConnectorsConfig } from '../../core/config'
 import type { ConnectorCenter } from '../../core/connector-center.js'
 import { TelegramConnector, splitMessage, MAX_MESSAGE_LENGTH } from './telegram-connector.js'
 import type { AccountManager } from '../../domain/trading/index.js'
 import type { Operation } from '../../domain/trading/git/types.js'
 import { getOperationSymbol } from '../../domain/trading/git/types.js'
 
-const BACKEND_LABELS: Record<AIBackend, string> = {
-  'claude-code': 'Claude Code',
-  'vercel-ai-sdk': 'Vercel AI SDK',
-  'agent-sdk': 'Agent SDK',
-  'codex': 'Codex',
+/** Build a display label for a profile. */
+function profileLabel(slug: string, profile: { label: string; backend: string; model: string }): string {
+  return `${profile.label} (${profile.model})`
 }
 
 export class TelegramPlugin implements Plugin {
@@ -89,8 +87,10 @@ export class TelegramPlugin implements Plugin {
 
     // ── Commands ──
     bot.command('status', async (ctx) => {
-      const aiConfig = await readAIBackend()
-      await this.sendReply(ctx.chat.id, `Engine is running. Provider: ${BACKEND_LABELS[aiConfig.backend]}`)
+      const aiConfig = await readAIProviderConfig()
+      const profile = aiConfig.profiles[aiConfig.activeProfile]
+      const label = profile ? profileLabel(aiConfig.activeProfile, profile) : aiConfig.activeProfile
+      await this.sendReply(ctx.chat.id, `Engine is running. Profile: ${label}`)
     })
 
     bot.command('settings', async (ctx) => {
@@ -115,21 +115,22 @@ export class TelegramPlugin implements Plugin {
     bot.on('callback_query:data', async (ctx) => {
       const data = ctx.callbackQuery.data
       try {
-        if (data.startsWith('provider:')) {
-          const backend = data.slice('provider:'.length) as AIBackend
-          await writeAIBackend(backend)
-          await ctx.answerCallbackQuery({ text: `Switched to ${BACKEND_LABELS[backend]}` })
+        if (data.startsWith('profile:')) {
+          const slug = data.slice('profile:'.length)
+          await setActiveProfile(slug)
+          const config = await readAIProviderConfig()
+          const profile = config.profiles[slug]
+          const label = profile ? profileLabel(slug, profile) : slug
+          await ctx.answerCallbackQuery({ text: `Switched to ${label}` })
 
           // Edit the original settings message in-place
-          const ccLabel = backend === 'claude-code' ? '> Claude Code' : 'Claude Code'
-          const aiLabel = backend === 'vercel-ai-sdk' ? '> Vercel AI SDK' : 'Vercel AI SDK'
-          const sdkLabel = backend === 'agent-sdk' ? '> Agent SDK' : 'Agent SDK'
           const keyboard = new InlineKeyboard()
-            .text(ccLabel, 'provider:claude-code')
-            .text(aiLabel, 'provider:vercel-ai-sdk')
-            .text(sdkLabel, 'provider:agent-sdk')
+          for (const [s, p] of Object.entries(config.profiles)) {
+            const prefix = s === slug ? '> ' : ''
+            keyboard.text(`${prefix}${p.label}`, `profile:${s}`)
+          }
           await ctx.editMessageText(
-            `Current provider: ${BACKEND_LABELS[backend]}\n\nChoose default AI provider:`,
+            `Current profile: ${label}\n\nChoose AI profile:`,
             { reply_markup: keyboard },
           )
         } else if (data.startsWith('trading:')) {
@@ -218,8 +219,8 @@ export class TelegramPlugin implements Plugin {
 
     // ── Initialize and get bot info ──
     await bot.init()
-    const aiConfig = await readAIBackend()
-    console.log(`telegram plugin: connected as @${bot.botInfo.username} (backend: ${aiConfig.backend})`)
+    const initConfig = await readAIProviderConfig()
+    console.log(`telegram plugin: connected as @${bot.botInfo.username} (profile: ${initConfig.activeProfile})`)
 
     // ── Register connector for outbound delivery (heartbeat / cron responses) ──
     if (this.config.allowedChatIds.length > 0) {
@@ -337,19 +338,19 @@ export class TelegramPlugin implements Plugin {
   }
 
   private async sendSettingsMenu(chatId: number) {
-    const aiConfig = await readAIBackend()
-    const ccLabel = aiConfig.backend === 'claude-code' ? '> Claude Code' : 'Claude Code'
-    const aiLabel = aiConfig.backend === 'vercel-ai-sdk' ? '> Vercel AI SDK' : 'Vercel AI SDK'
-    const sdkLabel = aiConfig.backend === 'agent-sdk' ? '> Agent SDK' : 'Agent SDK'
+    const config = await readAIProviderConfig()
+    const activeProfile = config.profiles[config.activeProfile]
+    const activeLabel = activeProfile ? profileLabel(config.activeProfile, activeProfile) : config.activeProfile
 
     const keyboard = new InlineKeyboard()
-      .text(ccLabel, 'provider:claude-code')
-      .text(aiLabel, 'provider:vercel-ai-sdk')
-      .text(sdkLabel, 'provider:agent-sdk')
+    for (const [slug, profile] of Object.entries(config.profiles)) {
+      const prefix = slug === config.activeProfile ? '> ' : ''
+      keyboard.text(`${prefix}${profile.label}`, `profile:${slug}`)
+    }
 
     await this.bot!.api.sendMessage(
       chatId,
-      `Current provider: ${BACKEND_LABELS[aiConfig.backend]}\n\nChoose default AI provider:`,
+      `Current profile: ${activeLabel}\n\nChoose AI profile:`,
       { reply_markup: keyboard },
     )
   }

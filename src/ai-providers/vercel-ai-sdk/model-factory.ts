@@ -1,13 +1,11 @@
 /**
- * Model factory — creates Vercel AI SDK LanguageModel instances from config.
+ * Model factory — creates Vercel AI SDK LanguageModel instances from a resolved profile.
  *
- * Reads ai-provider-manager.json from disk on each call so that model
- * changes take effect without a restart.  Uses dynamic imports so unused
- * provider packages don't prevent startup.
+ * Uses dynamic imports so unused provider packages don't prevent startup.
  */
 
 import type { LanguageModel } from 'ai'
-import { readAIProviderConfig } from '../../core/config.js'
+import type { ResolvedProfile } from '../../core/config.js'
 
 /** Result includes the model plus a cache key for change detection. */
 export interface ModelFromConfig {
@@ -16,42 +14,27 @@ export interface ModelFromConfig {
   key: string
 }
 
-/** Per-request model override (e.g. from a sub-channel's vercelAiSdk config). */
-export interface ModelOverride {
-  provider: string
-  model: string
-  baseUrl?: string
-  apiKey?: string
-}
-
-export async function createModelFromConfig(override?: ModelOverride): Promise<ModelFromConfig> {
-  // Resolve effective values: override takes precedence over global config
-  const config = await readAIProviderConfig()
-  const p = override?.provider ?? config.provider
-  const m = override?.model ?? config.model
-  const url = override?.baseUrl ?? config.baseUrl
+export async function createModelFromProfile(profile: ResolvedProfile): Promise<ModelFromConfig> {
+  const p = profile.provider ?? 'anthropic'
+  const m = profile.model
+  const url = profile.baseUrl
+  const apiKey = profile.apiKey
   const key = `${p}:${m}:${url ?? ''}`
-
-  // Resolve API key: override.apiKey > global config.apiKeys[provider]
-  const resolveApiKey = (provider: string) => {
-    if (override?.apiKey) return override.apiKey
-    return (config.apiKeys as Record<string, string | undefined>)[provider] || undefined
-  }
 
   switch (p) {
     case 'anthropic': {
       const { createAnthropic } = await import('@ai-sdk/anthropic')
-      const client = createAnthropic({ apiKey: resolveApiKey('anthropic'), baseURL: url || undefined })
+      const client = createAnthropic({ apiKey: apiKey || undefined, baseURL: url || undefined })
       return { model: client(m), key }
     }
     case 'openai': {
       const { createOpenAI } = await import('@ai-sdk/openai')
-      const client = createOpenAI({ apiKey: resolveApiKey('openai'), baseURL: url || undefined })
+      const client = createOpenAI({ apiKey: apiKey || undefined, baseURL: url || undefined })
       return { model: client(m), key }
     }
     case 'google': {
       const { createGoogleGenerativeAI } = await import('@ai-sdk/google')
-      const client = createGoogleGenerativeAI({ apiKey: resolveApiKey('google'), baseURL: url || undefined })
+      const client = createGoogleGenerativeAI({ apiKey: apiKey || undefined, baseURL: url || undefined })
       return { model: client(m), key }
     }
     default:

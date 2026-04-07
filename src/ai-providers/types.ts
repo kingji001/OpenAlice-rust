@@ -1,6 +1,7 @@
 import type { ISessionStore, SessionEntry } from '../core/session.js'
 import type { CompactionConfig, CompactionResult } from '../core/compaction.js'
 import type { MediaAttachment } from '../core/types.js'
+import type { ResolvedProfile } from '../core/config.js'
 
 // ==================== Provider Events ====================
 
@@ -30,9 +31,8 @@ export interface GenerateOpts {
   /** Max history entries to include (text providers only). */
   maxHistoryEntries?: number
   disabledTools?: string[]
-  vercelAiSdk?: { provider: string; model: string; baseUrl?: string; apiKey?: string }
-  agentSdk?: { model?: string; apiKey?: string; baseUrl?: string }
-  codex?: { model?: string; baseUrl?: string; apiKey?: string; loginMethod?: 'api-key' | 'codex-oauth' }
+  /** Resolved profile — contains model, apiKey, baseUrl, etc. */
+  profile?: ResolvedProfile
 }
 
 // ==================== AIProvider ====================

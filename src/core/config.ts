@@ -13,21 +13,79 @@ const engineSchema = z.object({
   port: z.number().int().positive().default(3000),
 })
 
-const loginMethodSchema = z.enum(['api-key', 'claudeai', 'codex-oauth'])
+// ==================== AI Provider: Legacy Schema (kept for migration) ====================
 
-export const aiProviderSchema = z.object({
+const legacyLoginMethodSchema = z.enum(['api-key', 'claudeai', 'codex-oauth'])
+
+/** @deprecated Legacy flat schema — used only for migration detection. */
+export const aiProviderLegacySchema = z.object({
   backend: z.enum(['claude-code', 'vercel-ai-sdk', 'agent-sdk', 'codex']).default('claude-code'),
   provider: z.string().default('anthropic'),
   model: z.string().default('claude-sonnet-4-6'),
   baseUrl: z.string().min(1).optional(),
-  /** Authentication method for Agent SDK: api-key (default), oauth (Console), claudeai (Pro/Max). */
-  loginMethod: loginMethodSchema.default('api-key'),
+  loginMethod: legacyLoginMethodSchema.default('api-key'),
   apiKeys: z.object({
     anthropic: z.string().optional(),
     openai: z.string().optional(),
     google: z.string().optional(),
   }).default({}),
 })
+
+// ==================== AI Provider: Profile-based Schema ====================
+
+export type AIBackend = 'agent-sdk' | 'codex' | 'vercel-ai-sdk'
+
+const apiKeysSchema = z.object({
+  anthropic: z.string().optional(),
+  openai: z.string().optional(),
+  google: z.string().optional(),
+})
+
+const baseProfileFields = {
+  label: z.string().min(1),
+  baseUrl: z.string().optional(),
+  apiKey: z.string().optional(),
+}
+
+export const agentSdkProfileSchema = z.object({
+  ...baseProfileFields,
+  backend: z.literal('agent-sdk'),
+  model: z.string().default('claude-sonnet-4-6'),
+  loginMethod: z.enum(['api-key', 'claudeai']).default('api-key'),
+})
+
+export const codexProfileSchema = z.object({
+  ...baseProfileFields,
+  backend: z.literal('codex'),
+  model: z.string().default('gpt-5.4'),
+  loginMethod: z.enum(['api-key', 'codex-oauth']).default('codex-oauth'),
+})
+
+export const vercelProfileSchema = z.object({
+  ...baseProfileFields,
+  backend: z.literal('vercel-ai-sdk'),
+  provider: z.string().default('anthropic'),
+  model: z.string().default('claude-sonnet-4-6'),
+})
+
+export const profileSchema = z.discriminatedUnion('backend', [
+  agentSdkProfileSchema, codexProfileSchema, vercelProfileSchema,
+])
+
+export type Profile = z.infer<typeof profileSchema>
+
+export const aiProviderSchema = z.object({
+  apiKeys: apiKeysSchema.default({}),
+  profiles: z.record(
+    z.string(),
+    profileSchema,
+  ).default({
+    default: { backend: 'agent-sdk', label: 'Claude Sonnet', model: 'claude-sonnet-4-6', loginMethod: 'claudeai' },
+  }),
+  activeProfile: z.string().default('default'),
+})
+
+export type AIProviderConfig = z.infer<typeof aiProviderSchema>
 
 const agentSchema = z.object({
   maxSteps: z.number().int().positive().default(20),
@@ -176,43 +234,14 @@ export const toolsSchema = z.object({
   disabled: z.array(z.string()).default([]),
 })
 
-/** Vercel AI SDK model override — per-channel provider/model/key/endpoint. */
-export const vercelAiSdkOverrideSchema = z.object({
-  provider: z.string(),
-  model: z.string(),
-  baseUrl: z.string().optional(),
-  apiKey: z.string().optional(),
-})
-
-/** Agent SDK model override — per-channel model/key/endpoint. */
-export const agentSdkOverrideSchema = z.object({
-  model: z.string().optional(),
-  apiKey: z.string().optional(),
-  baseUrl: z.string().optional(),
-  loginMethod: loginMethodSchema.optional(),
-})
-
-export const codexOverrideSchema = z.object({
-  model: z.string().optional(),
-  baseUrl: z.string().optional(),
-  apiKey: z.string().optional(),
-  loginMethod: z.enum(['api-key', 'codex-oauth']).optional(),
-})
-
 export const webSubchannelSchema = z.object({
   /** URL-safe identifier. Used as session path segment: data/sessions/web/{id}.jsonl */
   id: z.string().regex(/^[a-z0-9-_]+$/, 'id must be lowercase alphanumeric with hyphens/underscores'),
   label: z.string().min(1),
   /** System prompt override for this channel. */
   systemPrompt: z.string().optional(),
-  /** AI backend override. Falls back to global config if omitted. */
-  provider: z.enum(['claude-code', 'vercel-ai-sdk', 'agent-sdk', 'codex']).optional(),
-  /** Vercel AI SDK model override. Only used when provider is 'vercel-ai-sdk'. */
-  vercelAiSdk: vercelAiSdkOverrideSchema.optional(),
-  /** Agent SDK model override. Only used when provider is 'agent-sdk'. */
-  agentSdk: agentSdkOverrideSchema.optional(),
-  /** Codex model override. Only used when provider is 'codex'. */
-  codex: codexOverrideSchema.optional(),
+  /** AI provider profile slug. Falls back to global activeProfile if omitted. */
+  profile: z.string().optional(),
   /** Tool names to disable in addition to the global disabled list. */
   disabledTools: z.array(z.string()).optional(),
 })
@@ -292,32 +321,105 @@ export async function loadConfig(): Promise<Config> {
   const raws = await Promise.all(files.map((f) => loadJsonFile(f)))
 
   // TODO: remove all migration blocks before v1.0 — no stable release yet, breaking changes are fine
-  // ---------- Migration: consolidate old ai-provider + model + api-keys → ai-provider ----------
+  // ---------- Migration: flat ai-provider config → profile-based ----------
   const aiProviderRaw = raws[6] as Record<string, unknown> | undefined
-  if (aiProviderRaw && !('backend' in aiProviderRaw)) {
-    // Old format detected — merge model.json + api-keys.json into ai-provider-manager.json
+  if (aiProviderRaw && 'backend' in aiProviderRaw && !('profiles' in aiProviderRaw)) {
+    // Legacy flat format detected — convert to profile-based
+
+    // Step 1: handle very old format (model.json + api-keys.json)
+    if (!('model' in aiProviderRaw)) {
+      const oldModel = await loadJsonFile('model.json') as Record<string, unknown> | undefined
+      const oldKeys = await loadJsonFile('api-keys.json') as Record<string, unknown> | undefined
+      if (oldModel) Object.assign(aiProviderRaw, { provider: oldModel.provider, model: oldModel.model, ...(oldModel.baseUrl ? { baseUrl: oldModel.baseUrl } : {}) })
+      if (oldKeys) aiProviderRaw.apiKeys = oldKeys
+      await removeJsonFile('model.json')
+      await removeJsonFile('api-keys.json')
+    }
+
+    // Step 2: handle claude-code → agent-sdk alias
+    if (aiProviderRaw.backend === 'claude-code') {
+      aiProviderRaw.backend = 'agent-sdk'
+      aiProviderRaw.loginMethod = aiProviderRaw.loginMethod ?? 'claudeai'
+    }
+
+    // Step 3: build default profile from flat config
+    const legacy = aiProviderLegacySchema.parse(aiProviderRaw)
+    const defaultProfile: Record<string, unknown> = { label: 'Default' }
+    if (legacy.backend === 'agent-sdk') {
+      defaultProfile.backend = 'agent-sdk'
+      defaultProfile.model = legacy.model
+      defaultProfile.loginMethod = legacy.loginMethod === 'codex-oauth' ? 'api-key' : legacy.loginMethod
+    } else if (legacy.backend === 'codex') {
+      defaultProfile.backend = 'codex'
+      defaultProfile.model = legacy.model
+      defaultProfile.loginMethod = legacy.loginMethod === 'claudeai' ? 'codex-oauth' : legacy.loginMethod
+    } else {
+      defaultProfile.backend = 'vercel-ai-sdk'
+      defaultProfile.provider = legacy.provider
+      defaultProfile.model = legacy.model
+    }
+    if (legacy.baseUrl) defaultProfile.baseUrl = legacy.baseUrl
+
+    // Step 4: migrate subchannel inline overrides → named profiles
+    const oldSubchannels = await loadJsonFile('web-subchannels.json') as Array<Record<string, unknown>> | undefined
+    const profiles: Record<string, unknown> = { default: defaultProfile }
+    const newSubchannels: Array<Record<string, unknown>> = []
+
+    if (oldSubchannels) {
+      for (const ch of oldSubchannels) {
+        const sub: Record<string, unknown> = { id: ch.id, label: ch.label }
+        if (ch.systemPrompt) sub.systemPrompt = ch.systemPrompt
+        if (ch.disabledTools) sub.disabledTools = ch.disabledTools
+
+        const provider = ch.provider as string | undefined
+        const override = provider === 'vercel-ai-sdk' ? ch.vercelAiSdk
+          : provider === 'agent-sdk' ? ch.agentSdk
+          : provider === 'codex' ? ch.codex
+          : undefined
+
+        if (provider && override) {
+          const slug = `${ch.id}-${provider}`
+          profiles[slug] = { backend: provider, label: `${ch.label}`, ...(override as object) }
+          sub.profile = slug
+        } else if (provider) {
+          // Provider set but no override — create a profile with just the backend
+          const slug = `${ch.id}-${provider}`
+          profiles[slug] = { ...defaultProfile, backend: provider, label: `${ch.label}` }
+          sub.profile = slug
+        }
+
+        newSubchannels.push(sub)
+      }
+      await writeFile(resolve(CONFIG_DIR, 'web-subchannels.json'), JSON.stringify(newSubchannels, null, 2) + '\n')
+    }
+
+    // Step 5: write new format
+    const migrated = { apiKeys: legacy.apiKeys, profiles, activeProfile: 'default' }
+    raws[6] = migrated
+    await mkdir(CONFIG_DIR, { recursive: true })
+    await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(migrated, null, 2) + '\n')
+  } else if (aiProviderRaw && !('backend' in aiProviderRaw) && !('profiles' in aiProviderRaw)) {
+    // Very old format (no backend, no profiles) — handle model.json merge first
     const oldModel = await loadJsonFile('model.json') as Record<string, unknown> | undefined
     const oldKeys = await loadJsonFile('api-keys.json') as Record<string, unknown> | undefined
     const migrated = {
-      backend: aiProviderRaw.provider ?? 'claude-code',
-      provider: oldModel?.provider ?? 'anthropic',
-      model: oldModel?.model ?? 'claude-sonnet-4-6',
-      ...(oldModel?.baseUrl ? { baseUrl: oldModel.baseUrl } : {}),
       apiKeys: oldKeys ?? {},
+      profiles: {
+        default: {
+          backend: 'agent-sdk',
+          label: 'Default',
+          model: (oldModel?.model as string) ?? 'claude-sonnet-4-6',
+          loginMethod: 'claudeai',
+          provider: (oldModel?.provider as string) ?? 'anthropic',
+        },
+      },
+      activeProfile: 'default',
     }
     raws[6] = migrated
     await mkdir(CONFIG_DIR, { recursive: true })
     await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(migrated, null, 2) + '\n')
     await removeJsonFile('model.json')
     await removeJsonFile('api-keys.json')
-  }
-
-  // ---------- Migration: claude-code backend → agent-sdk + claudeai ----------
-  if (aiProviderRaw && (aiProviderRaw as Record<string, unknown>).backend === 'claude-code') {
-    const patched = { ...(aiProviderRaw as Record<string, unknown>), backend: 'agent-sdk', loginMethod: 'claudeai' }
-    raws[6] = patched
-    await mkdir(CONFIG_DIR, { recursive: true })
-    await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(patched, null, 2) + '\n')
   }
 
   // ---------- Migration: consolidate old telegram.json + engine port fields ----------
@@ -452,22 +554,72 @@ export async function readConnectorsConfig() {
   }
 }
 
-// ==================== AI Backend Helpers ====================
+// ==================== Profile Helpers ====================
 
-export type AIBackend = 'claude-code' | 'vercel-ai-sdk' | 'agent-sdk' | 'codex'
-
-/** Read the current AI backend from ai-provider-manager.json. */
-export async function readAIBackend(): Promise<{ backend: AIBackend }> {
-  const config = await readAIProviderConfig()
-  return { backend: config.backend }
+/** Resolved profile with apiKey filled from global keys. */
+export interface ResolvedProfile {
+  backend: AIBackend
+  label: string
+  model: string
+  apiKey?: string
+  baseUrl?: string
+  loginMethod?: string
+  provider?: string
 }
 
-/** Switch the AI backend in ai-provider-manager.json (preserves other fields). */
-export async function writeAIBackend(backend: AIBackend): Promise<void> {
-  const current = await readAIProviderConfig()
-  const updated = { ...current, backend }
+/** Resolve a profile by slug, filling in global apiKey fallback. */
+export async function resolveProfile(slug?: string): Promise<ResolvedProfile> {
+  const config = await readAIProviderConfig()
+  const key = slug ?? config.activeProfile
+  const profile = config.profiles[key]
+  if (!profile) throw new Error(`Unknown AI provider profile: "${key}"`)
+  const vendor = profile.backend === 'codex' ? 'openai'
+    : profile.backend === 'agent-sdk' ? 'anthropic'
+    : (profile as { provider?: string }).provider ?? 'anthropic'
+  return {
+    ...profile,
+    apiKey: profile.apiKey ?? (config.apiKeys as Record<string, string | undefined>)[vendor],
+  }
+}
+
+/** Get the active profile slug. */
+export async function getActiveProfileSlug(): Promise<string> {
+  const config = await readAIProviderConfig()
+  return config.activeProfile
+}
+
+/** Set the active profile. */
+export async function setActiveProfile(slug: string): Promise<void> {
+  const config = await readAIProviderConfig()
+  if (!config.profiles[slug]) throw new Error(`Unknown profile: "${slug}"`)
+  const updated = { ...config, activeProfile: slug }
   await mkdir(CONFIG_DIR, { recursive: true })
   await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(updated, null, 2) + '\n')
+}
+
+/** Write a single profile (create or update). */
+export async function writeProfile(slug: string, profile: Profile): Promise<void> {
+  const config = await readAIProviderConfig()
+  config.profiles[slug] = profile
+  await mkdir(CONFIG_DIR, { recursive: true })
+  await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
+}
+
+/** Delete a profile. Cannot delete the active profile. */
+export async function deleteProfile(slug: string): Promise<void> {
+  const config = await readAIProviderConfig()
+  if (config.activeProfile === slug) throw new Error('Cannot delete the active profile')
+  delete config.profiles[slug]
+  await mkdir(CONFIG_DIR, { recursive: true })
+  await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
+}
+
+/** Update global API keys. */
+export async function writeApiKeys(keys: { anthropic?: string; openai?: string; google?: string }): Promise<void> {
+  const config = await readAIProviderConfig()
+  config.apiKeys = { ...config.apiKeys, ...keys }
+  await mkdir(CONFIG_DIR, { recursive: true })
+  await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
 }
 
 // ==================== Writer ====================

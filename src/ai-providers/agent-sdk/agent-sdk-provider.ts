@@ -15,7 +15,7 @@ import type { SessionEntry } from '../../core/session.js'
 import type { AgentSdkConfig, AgentSdkOverride } from './query.js'
 import { toTextHistory } from '../../core/session.js'
 import { buildChatHistoryPrompt, DEFAULT_MAX_HISTORY } from '../utils.js'
-import { readAgentConfig } from '../../core/config.js'
+import { readAgentConfig, resolveProfile } from '../../core/config.js'
 import { createChannel } from '../../core/async-channel.js'
 import { askAgentSdk } from './query.js'
 import { buildAgentSdkMcpServer } from './tool-bridge.js'
@@ -47,8 +47,13 @@ export class AgentSdkProvider implements AIProvider {
   async ask(prompt: string): Promise<ProviderResult> {
     const config = await this.resolveConfig()
     config.systemPrompt = await this.getSystemPrompt()
+    const profile = await resolveProfile()
+    const override: AgentSdkOverride = {
+      model: profile.model, apiKey: profile.apiKey, baseUrl: profile.baseUrl,
+      loginMethod: profile.loginMethod as 'api-key' | 'claudeai' | undefined,
+    }
     const mcpServer = await this.buildMcpServer()
-    const result = await askAgentSdk(prompt, config, undefined, mcpServer)
+    const result = await askAgentSdk(prompt, config, override, mcpServer)
     return { text: result.text, media: [] }
   }
 
@@ -66,7 +71,11 @@ export class AgentSdkProvider implements AIProvider {
       systemPrompt: opts?.systemPrompt ?? await this.getSystemPrompt(),
     }
 
-    const override: AgentSdkOverride | undefined = opts?.agentSdk
+    // Build override from resolved profile
+    const profile = opts?.profile
+    const override: AgentSdkOverride | undefined = profile
+      ? { model: profile.model, apiKey: profile.apiKey, baseUrl: profile.baseUrl, loginMethod: profile.loginMethod as 'api-key' | 'claudeai' | undefined }
+      : undefined
     const mcpServer = await this.buildMcpServer(opts?.disabledTools)
 
     const channel = createChannel<ProviderEvent>()

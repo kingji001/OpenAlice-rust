@@ -5,7 +5,7 @@ import { AgentCenter } from './agent-center.js'
 import { GenerateRouter } from './ai-provider-manager.js'
 import { DEFAULT_COMPACTION_CONFIG, type CompactionConfig } from './compaction.js'
 import { VercelAIProvider } from '../ai-providers/vercel-ai-sdk/vercel-provider.js'
-import { createModelFromConfig } from '../ai-providers/vercel-ai-sdk/model-factory.js'
+import { createModelFromProfile } from '../ai-providers/vercel-ai-sdk/model-factory.js'
 import { MemorySessionStore, type SessionEntry } from './session.js'
 
 // ==================== Helpers ====================
@@ -42,7 +42,7 @@ function makeAgentCenter(overrides: MakeAgentCenterOpts = {}): AgentCenter {
   const maxSteps = overrides.maxSteps ?? 1
   const compaction = overrides.compaction ?? DEFAULT_COMPACTION_CONFIG
 
-  vi.mocked(createModelFromConfig).mockResolvedValue({ model, key: 'test:mock-model' })
+  vi.mocked(createModelFromProfile).mockResolvedValue({ model, key: 'test:mock-model' })
   const provider = new VercelAIProvider(async () => tools, async () => instructions, maxSteps)
   const router = new GenerateRouter(provider, null)
 
@@ -52,7 +52,12 @@ function makeAgentCenter(overrides: MakeAgentCenterOpts = {}): AgentCenter {
 // ==================== Mock model-factory ====================
 
 vi.mock('../ai-providers/vercel-ai-sdk/model-factory.js', () => ({
-  createModelFromConfig: vi.fn(),
+  createModelFromProfile: vi.fn(),
+}))
+
+vi.mock('./config.js', () => ({
+  resolveProfile: vi.fn().mockResolvedValue({ backend: 'vercel-ai-sdk', label: 'Test', model: 'mock-model', provider: 'anthropic' }),
+  readAgentConfig: vi.fn().mockResolvedValue({ maxSteps: 20, evolutionMode: false, claudeCode: { disallowedTools: [], maxTurns: 20 } }),
 }))
 
 // ==================== Mock compaction ====================

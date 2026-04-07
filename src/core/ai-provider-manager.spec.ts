@@ -129,6 +129,13 @@ describe('StreamableResult', () => {
 
 // ==================== GenerateRouter ====================
 
+vi.mock('./config.js', () => ({
+  resolveProfile: vi.fn(),
+}))
+
+import { resolveProfile } from './config.js'
+const mockResolveProfile = vi.mocked(resolveProfile)
+
 describe('GenerateRouter', () => {
   function makeProvider(tag: AIProvider['providerTag']): AIProvider {
     return {
@@ -138,56 +145,49 @@ describe('GenerateRouter', () => {
     }
   }
 
-  it('should resolve to vercel when no override and config fallback', async () => {
-    const vercel = makeProvider('vercel-ai')
-    const router = new GenerateRouter(vercel, null)
-
-    // Without override, reads config — agentSdk is null so falls back to vercel
-    const provider = await router.resolve()
-    expect(provider).toBe(vercel)
-  })
-
-  it('should resolve override claude-code as alias for agent-sdk', async () => {
+  it('should resolve profile and pick matching provider', async () => {
     const vercel = makeProvider('vercel-ai')
     const agentSdk = makeProvider('agent-sdk')
     const router = new GenerateRouter(vercel, agentSdk)
 
-    const provider = await router.resolve('claude-code')
+    mockResolveProfile.mockResolvedValue({ backend: 'agent-sdk', label: 'Claude', model: 'claude-sonnet-4-6' })
+    const { provider } = await router.resolve('claude-main')
     expect(provider).toBe(agentSdk)
   })
 
-  it('should resolve override agent-sdk when available', async () => {
-    const vercel = makeProvider('vercel-ai')
-    const agentSdk = makeProvider('agent-sdk')
-    const router = new GenerateRouter(vercel, agentSdk)
-
-    const provider = await router.resolve('agent-sdk')
-    expect(provider).toBe(agentSdk)
-  })
-
-  it('should fallback to vercel when override claude-code but not available', async () => {
+  it('should resolve active profile when no slug given', async () => {
     const vercel = makeProvider('vercel-ai')
     const router = new GenerateRouter(vercel, null)
 
-    // Override requests claude-code but it's null — falls through to config read
-    const provider = await router.resolve('claude-code')
-    // Config read will happen, but since claudeCode is null, falls to vercel
+    mockResolveProfile.mockResolvedValue({ backend: 'vercel-ai-sdk', label: 'Vercel', model: 'claude-sonnet-4-6', provider: 'anthropic' })
+    const { provider } = await router.resolve()
     expect(provider).toBe(vercel)
   })
 
-  it('should resolve override vercel-ai-sdk directly', async () => {
+  it('should throw when backend has no registered provider', async () => {
     const vercel = makeProvider('vercel-ai')
-    const cc = makeProvider('claude-code')
-    const router = new GenerateRouter(vercel, cc)
+    const router = new GenerateRouter(vercel, null) // no agent-sdk
 
-    const provider = await router.resolve('vercel-ai-sdk')
-    expect(provider).toBe(vercel)
+    mockResolveProfile.mockResolvedValue({ backend: 'agent-sdk', label: 'Claude', model: 'x' })
+    await expect(router.resolve('test')).rejects.toThrow('No provider registered for backend')
   })
 
-  it('should delegate ask to resolved provider', async () => {
+  it('should resolve codex provider', async () => {
+    const vercel = makeProvider('vercel-ai')
+    const codex = makeProvider('codex')
+    const router = new GenerateRouter(vercel, null, codex)
+
+    mockResolveProfile.mockResolvedValue({ backend: 'codex', label: 'GPT', model: 'gpt-5.4' })
+    const { provider, profile } = await router.resolve('gpt-main')
+    expect(provider).toBe(codex)
+    expect(profile.model).toBe('gpt-5.4')
+  })
+
+  it('should delegate ask to active profile provider', async () => {
     const vercel = makeProvider('vercel-ai')
     const router = new GenerateRouter(vercel, null)
 
+    mockResolveProfile.mockResolvedValue({ backend: 'vercel-ai-sdk', label: 'V', model: 'x', provider: 'anthropic' })
     const result = await router.ask('test prompt')
     expect(result.text).toBe('from-vercel-ai')
     expect(vercel.ask).toHaveBeenCalledWith('test prompt')

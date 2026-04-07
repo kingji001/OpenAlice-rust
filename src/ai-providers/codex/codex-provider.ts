@@ -15,9 +15,10 @@ import { pino } from 'pino'
 
 import type { ProviderResult, ProviderEvent, AIProvider, GenerateOpts } from '../types.js'
 import type { SessionEntry } from '../../core/session.js'
+import type { ResolvedProfile } from '../../core/config.js'
 import { toTextHistory } from '../../core/session.js'
 import { buildChatHistoryPrompt, DEFAULT_MAX_HISTORY } from '../utils.js'
-import { readAIProviderConfig, readAgentConfig } from '../../core/config.js'
+import { readAgentConfig } from '../../core/config.js'
 import { getAccessToken, clearTokenCache } from './auth.js'
 import { convertTools } from './tool-bridge.js'
 
@@ -40,28 +41,27 @@ export class CodexProvider implements AIProvider {
   ) {}
 
   /**
-   * Create an OpenAI client.
+   * Create an OpenAI client from a resolved profile.
    *
    * - loginMethod 'codex-oauth' (default): reads ~/.codex/auth.json, hits
    *   ChatGPT subscription endpoint. Usage billed to ChatGPT plan.
-   * - loginMethod 'api-key': uses apiKeys.openai from config (or override).
+   * - loginMethod 'api-key': uses profile apiKey.
    *   Standard OpenAI API billing, or compatible third-party endpoint.
    */
-  private async createClient(opts?: GenerateOpts): Promise<{ client: OpenAI; model: string }> {
-    const aiConfig = await readAIProviderConfig()
-    const model = opts?.codex?.model ?? aiConfig.model ?? DEFAULT_MODEL
-    const loginMethod = opts?.codex?.loginMethod ?? aiConfig.loginMethod ?? 'codex-oauth'
+  private async createClient(profile?: ResolvedProfile): Promise<{ client: OpenAI; model: string }> {
+    const model = profile?.model ?? DEFAULT_MODEL
+    const loginMethod = profile?.loginMethod ?? 'codex-oauth'
 
     if (loginMethod === 'api-key') {
-      const apiKey = opts?.codex?.apiKey ?? aiConfig.apiKeys.openai
-      if (!apiKey) throw new Error('Codex api-key mode requires apiKeys.openai in config.')
-      const baseURL = opts?.codex?.baseUrl ?? aiConfig.baseUrl ?? DEFAULT_API_BASE_URL
+      const apiKey = profile?.apiKey
+      if (!apiKey) throw new Error('Codex api-key mode requires an API key. Configure it in your profile.')
+      const baseURL = profile?.baseUrl ?? DEFAULT_API_BASE_URL
       return { client: new OpenAI({ apiKey, baseURL }), model }
     }
 
     // OAuth mode
     const token = await getAccessToken()
-    const baseURL = opts?.codex?.baseUrl ?? DEFAULT_OAUTH_BASE_URL
+    const baseURL = profile?.baseUrl ?? DEFAULT_OAUTH_BASE_URL
     return { client: new OpenAI({ apiKey: token, baseURL }), model }
   }
 
@@ -99,7 +99,7 @@ export class CodexProvider implements AIProvider {
     const textHistory = toTextHistory(entries).slice(-maxHistory)
     const fullPrompt = buildChatHistoryPrompt(prompt, textHistory, opts?.historyPreamble)
 
-    const { client, model } = await this.createClient(opts)
+    const { client, model } = await this.createClient(opts?.profile)
     const instructions = opts?.systemPrompt ?? await this.getSystemPrompt()
     const agentConfig = await readAgentConfig()
     const maxSteps = agentConfig.maxSteps
