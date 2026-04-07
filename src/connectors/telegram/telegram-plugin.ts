@@ -21,6 +21,7 @@ const BACKEND_LABELS: Record<AIBackend, string> = {
   'claude-code': 'Claude Code',
   'vercel-ai-sdk': 'Vercel AI SDK',
   'agent-sdk': 'Agent SDK',
+  'codex': 'Codex',
 }
 
 export class TelegramPlugin implements Plugin {

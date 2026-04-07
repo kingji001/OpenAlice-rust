@@ -34,6 +34,7 @@ import { AgentCenter } from './core/agent-center.js'
 import { GenerateRouter } from './core/ai-provider-manager.js'
 import { VercelAIProvider } from './ai-providers/vercel-ai-sdk/vercel-provider.js'
 import { AgentSdkProvider } from './ai-providers/agent-sdk/agent-sdk-provider.js'
+import { CodexProvider } from './ai-providers/codex/index.js'
 import { createEventLog } from './core/event-log.js'
 import { createToolCallLog } from './core/tool-call-log.js'
 import { createCronEngine, createCronListener, createCronTools } from './task/cron/index.js'
@@ -223,7 +224,11 @@ async function main() {
     () => toolCenter.getVercelTools(),
     getInstructions,
   )
-  const router = new GenerateRouter(vercelProvider, agentSdkProvider)
+  const codexProvider = new CodexProvider(
+    () => toolCenter.getVercelTools(),
+    getInstructions,
+  )
+  const router = new GenerateRouter(vercelProvider, agentSdkProvider, codexProvider)
 
   const agentCenter = new AgentCenter({
     router,

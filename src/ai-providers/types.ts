@@ -32,6 +32,7 @@ export interface GenerateOpts {
   disabledTools?: string[]
   vercelAiSdk?: { provider: string; model: string; baseUrl?: string; apiKey?: string }
   agentSdk?: { model?: string; apiKey?: string; baseUrl?: string }
+  codex?: { model?: string; baseUrl?: string }
 }
 
 // ==================== AIProvider ====================
@@ -44,7 +45,7 @@ export interface GenerateOpts {
  */
 export interface AIProvider {
   /** Session log provenance tag. */
-  readonly providerTag: 'vercel-ai' | 'claude-code' | 'agent-sdk'
+  readonly providerTag: 'vercel-ai' | 'claude-code' | 'agent-sdk' | 'codex'
   /** Stateless one-shot prompt (used for compaction summarization, etc.). */
   ask(prompt: string): Promise<ProviderResult>
   /** Stream events from the backend. Yields tool_use/tool_result/text, then done. */

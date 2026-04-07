@@ -96,6 +96,7 @@ export class AgentCenter {
       disabledTools: opts?.disabledTools,
       vercelAiSdk: opts?.vercelAiSdk,
       agentSdk: opts?.agentSdk,
+      codex: opts?.codex,
     }
     const source = provider.generate(entries, prompt, genOpts)
 

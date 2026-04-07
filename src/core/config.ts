@@ -16,7 +16,7 @@ const engineSchema = z.object({
 const loginMethodSchema = z.enum(['api-key', 'claudeai'])
 
 export const aiProviderSchema = z.object({
-  backend: z.enum(['claude-code', 'vercel-ai-sdk', 'agent-sdk']).default('claude-code'),
+  backend: z.enum(['claude-code', 'vercel-ai-sdk', 'agent-sdk', 'codex']).default('claude-code'),
   provider: z.string().default('anthropic'),
   model: z.string().default('claude-sonnet-4-6'),
   baseUrl: z.string().min(1).optional(),
@@ -192,6 +192,11 @@ export const agentSdkOverrideSchema = z.object({
   loginMethod: loginMethodSchema.optional(),
 })
 
+export const codexOverrideSchema = z.object({
+  model: z.string().optional(),
+  baseUrl: z.string().optional(),
+})
+
 export const webSubchannelSchema = z.object({
   /** URL-safe identifier. Used as session path segment: data/sessions/web/{id}.jsonl */
   id: z.string().regex(/^[a-z0-9-_]+$/, 'id must be lowercase alphanumeric with hyphens/underscores'),
@@ -199,11 +204,13 @@ export const webSubchannelSchema = z.object({
   /** System prompt override for this channel. */
   systemPrompt: z.string().optional(),
   /** AI backend override. Falls back to global config if omitted. */
-  provider: z.enum(['claude-code', 'vercel-ai-sdk', 'agent-sdk']).optional(),
+  provider: z.enum(['claude-code', 'vercel-ai-sdk', 'agent-sdk', 'codex']).optional(),
   /** Vercel AI SDK model override. Only used when provider is 'vercel-ai-sdk'. */
   vercelAiSdk: vercelAiSdkOverrideSchema.optional(),
   /** Agent SDK model override. Only used when provider is 'agent-sdk'. */
   agentSdk: agentSdkOverrideSchema.optional(),
+  /** Codex model override. Only used when provider is 'codex'. */
+  codex: codexOverrideSchema.optional(),
   /** Tool names to disable in addition to the global disabled list. */
   disabledTools: z.array(z.string()).optional(),
 })
@@ -445,7 +452,7 @@ export async function readConnectorsConfig() {
 
 // ==================== AI Backend Helpers ====================
 
-export type AIBackend = 'claude-code' | 'vercel-ai-sdk' | 'agent-sdk'
+export type AIBackend = 'claude-code' | 'vercel-ai-sdk' | 'agent-sdk' | 'codex'
 
 /** Read the current AI backend from ai-provider-manager.json. */
 export async function readAIBackend(): Promise<{ backend: AIBackend }> {
