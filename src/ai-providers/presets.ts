@@ -12,7 +12,7 @@
  */
 
 import { z } from 'zod'
-import type { AIBackend } from '../core/config.js'
+// AIBackend type used implicitly via z.literal() values
 
 // ==================== Serialized Preset (sent to frontend) ====================
 
@@ -184,13 +184,13 @@ const PRESET_DEFS: PresetDef[] = [
   {
     id: 'minimax',
     label: 'MiniMax',
-    description: 'MiniMax models via Anthropic-compatible API',
+    description: 'MiniMax models via Claude Agent SDK (Anthropic-compatible)',
     category: 'third-party',
     defaultName: 'MiniMax',
     hint: 'Get your API key at minimaxi.com',
     zodSchema: z.object({
-      backend: z.literal('vercel-ai-sdk' as const),
-      provider: z.literal('anthropic' as const),
+      backend: z.literal('agent-sdk' as const),
+      loginMethod: z.literal('api-key' as const),
       baseUrl: z.literal('https://api.minimaxi.com/anthropic').describe('MiniMax API endpoint'),
       model: z.string().default('MiniMax-M2.7').describe('Model'),
       apiKey: z.string().min(1).describe('MiniMax API key'),
