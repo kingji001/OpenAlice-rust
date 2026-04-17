@@ -71,6 +71,20 @@ export interface TriggerPayload {
   data: Record<string, unknown>
 }
 
+export interface TriggerDonePayload {
+  source: string
+  name: string
+  reply: string
+  durationMs: number
+}
+
+export interface TriggerErrorPayload {
+  source: string
+  name: string
+  error: string
+  durationMs: number
+}
+
 // ==================== Event Map ====================
 
 // Import the actual CronFirePayload type for use in the map
@@ -86,6 +100,8 @@ export interface AgentEventMap {
   'message.received': MessageReceivedPayload
   'message.sent': MessageSentPayload
   'trigger': TriggerPayload
+  'trigger.done': TriggerDonePayload
+  'trigger.error': TriggerErrorPayload
 }
 
 // ==================== TypeBox Schemas ====================
@@ -147,6 +163,20 @@ const TriggerSchema = Type.Object({
   data: Type.Record(Type.String(), Type.Unknown()),
 })
 
+const TriggerDoneSchema = Type.Object({
+  source: Type.String(),
+  name: Type.String(),
+  reply: Type.String(),
+  durationMs: Type.Number(),
+})
+
+const TriggerErrorSchema = Type.Object({
+  source: Type.String(),
+  name: Type.String(),
+  error: Type.String(),
+  durationMs: Type.Number(),
+})
+
 /** Schema registry — same keys as AgentEventMap. */
 export const AgentEventSchemas: { [K in keyof AgentEventMap]: TSchema } = {
   'cron.fire': CronFireSchema,
@@ -158,6 +188,8 @@ export const AgentEventSchemas: { [K in keyof AgentEventMap]: TSchema } = {
   'message.received': MessageReceivedSchema,
   'message.sent': MessageSentSchema,
   'trigger': TriggerSchema,
+  'trigger.done': TriggerDoneSchema,
+  'trigger.error': TriggerErrorSchema,
 }
 
 // ==================== Runtime Validation ====================

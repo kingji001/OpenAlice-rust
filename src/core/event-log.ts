@@ -26,6 +26,14 @@ export interface EventLogEntry<T = unknown> {
   type: string
   /** Arbitrary JSON-serializable payload. */
   payload: T
+  /** Parent event's seq — present if this event was emitted in response to another. */
+  causedBy?: number
+}
+
+/** Options accepted by EventLog.append(). */
+export interface AppendOpts {
+  /** Parent event's seq. Set by listeners to link a child event back to what triggered it. */
+  causedBy?: number
 }
 
 export type EventLogListener = (entry: EventLogEntry) => void
@@ -40,9 +48,9 @@ export interface EventLogQueryResult {
 
 export interface EventLog {
   /** Append a typed event (registered in AgentEventMap). Validates payload at runtime. */
-  append<K extends keyof AgentEventMap>(type: K, payload: AgentEventMap[K]): Promise<EventLogEntry<AgentEventMap[K]>>
+  append<K extends keyof AgentEventMap>(type: K, payload: AgentEventMap[K], opts?: AppendOpts): Promise<EventLogEntry<AgentEventMap[K]>>
   /** Append an unregistered event (no runtime validation). */
-  append<T>(type: string, payload: T): Promise<EventLogEntry<T>>
+  append<T>(type: string, payload: T, opts?: AppendOpts): Promise<EventLogEntry<T>>
 
   /**
    * Read events from the DISK log file.
@@ -123,7 +131,7 @@ export async function createEventLog(opts?: {
 
   // ---------- append ----------
 
-  async function append<T>(type: string, payload: T): Promise<EventLogEntry<T>> {
+  async function append<T>(type: string, payload: T, opts?: AppendOpts): Promise<EventLogEntry<T>> {
     validateEventPayload(type, payload)
     seq += 1
     const entry: EventLogEntry<T> = {
@@ -131,6 +139,9 @@ export async function createEventLog(opts?: {
       ts: Date.now(),
       type,
       payload,
+    }
+    if (opts?.causedBy !== undefined) {
+      entry.causedBy = opts.causedBy
     }
 
     // Dual write: disk first, then memory

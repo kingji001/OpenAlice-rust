@@ -42,6 +42,7 @@ import { createToolCallLog } from './core/tool-call-log.js'
 import { createListenerRegistry } from './core/listener-registry.js'
 import { createCronEngine, createCronListener, createCronTools } from './task/cron/index.js'
 import { createHeartbeat } from './task/heartbeat/index.js'
+import { createTriggerListener } from './task/trigger/index.js'
 import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
 import { createNewsArchiveTools } from './tool/news.js'
 
@@ -284,6 +285,15 @@ async function main() {
     console.log(`heartbeat: enabled (every ${config.heartbeat.every})`)
   }
 
+  // ==================== Trigger Listener (external event router) ====================
+
+  const triggerSession = new SessionStore('trigger/default')
+  await triggerSession.restore()
+  const triggerListener = createTriggerListener({
+    connectorCenter, agentCenter, registry: listenerRegistry, session: triggerSession,
+  })
+  await triggerListener.start()
+
   // ==================== Activate Listeners + Start Cron Engine ====================
 
   await listenerRegistry.start()
@@ -419,6 +429,7 @@ async function main() {
 
   const ctx: EngineContext = {
     config, connectorCenter, agentCenter, eventLog, toolCallLog, heartbeat, cronEngine, toolCenter,
+    listenerRegistry,
     bbEngine: getSDKExecutor(),
     accountManager, fxService, snapshotService,
     newsProvider: newsStore,
@@ -440,6 +451,7 @@ async function main() {
     newsCollector?.stop()
     snapshotScheduler.stop()
     heartbeat.stop()
+    triggerListener.stop()
     cronListener.stop()
     cronEngine.stop()
     await listenerRegistry.stop()

@@ -89,7 +89,7 @@ describe('cron listener', () => {
     })
 
     it('should write cron.done event on success', async () => {
-      await eventLog.append('cron.fire', {
+      const fireEntry = await eventLog.append('cron.fire', {
         jobId: 'abc12345',
         jobName: 'test-job',
         payload: 'Do something',
@@ -107,6 +107,7 @@ describe('cron listener', () => {
         reply: 'AI reply',
       })
       expect((done[0].payload as any).durationMs).toBeGreaterThanOrEqual(0)
+      expect(done[0].causedBy).toBe(fireEntry.seq)
     })
 
     it('should not react to other event types', async () => {
@@ -187,7 +188,7 @@ describe('cron listener', () => {
     it('should write cron.error on engine failure', async () => {
       mockEngine.setShouldFail(true)
 
-      await eventLog.append('cron.fire', {
+      const fireEntry = await eventLog.append('cron.fire', {
         jobId: 'abc12345',
         jobName: 'test-job',
         payload: 'Will fail',
@@ -205,6 +206,7 @@ describe('cron listener', () => {
         error: 'engine error',
       })
       expect((errors[0].payload as any).durationMs).toBeGreaterThanOrEqual(0)
+      expect(errors[0].causedBy).toBe(fireEntry.seq)
     })
   })
 

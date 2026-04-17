@@ -9,7 +9,7 @@ describe('AgentEventSchemas', () => {
     'cron.fire', 'cron.done', 'cron.error',
     'heartbeat.done', 'heartbeat.skip', 'heartbeat.error',
     'message.received', 'message.sent',
-    'trigger',
+    'trigger', 'trigger.done', 'trigger.error',
   ]
 
   it('should have a schema for every key in AgentEventMap', () => {
@@ -130,6 +130,26 @@ describe('validateEventPayload', () => {
     expect(() => validateEventPayload('trigger', {
       name: 'test', data: {},
     })).toThrow(/Invalid payload.*trigger/)
+  })
+
+  // -- trigger.done --
+  it('should accept valid trigger.done payload', () => {
+    expect(() => validateEventPayload('trigger.done', {
+      source: 'webhook', name: 'ping', reply: 'ok', durationMs: 300,
+    })).not.toThrow()
+  })
+
+  it('should reject trigger.done with missing reply', () => {
+    expect(() => validateEventPayload('trigger.done', {
+      source: 'webhook', name: 'ping', durationMs: 300,
+    })).toThrow(/Invalid payload.*trigger\.done/)
+  })
+
+  // -- trigger.error --
+  it('should accept valid trigger.error payload', () => {
+    expect(() => validateEventPayload('trigger.error', {
+      source: 'webhook', name: 'ping', error: 'boom', durationMs: 50,
+    })).not.toThrow()
   })
 
   // -- unregistered types --

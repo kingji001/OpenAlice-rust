@@ -1,10 +1,34 @@
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import type { EngineContext } from '../../../core/types.js'
+import type { TriggerPayload } from '../../../core/agent-event.js'
+import { validateEventPayload } from '../../../core/agent-event.js'
 
-/** Event log routes: GET /, GET /recent, GET /stream (SSE) */
+/** Event log routes: GET /, GET /recent, GET /stream (SSE), POST /ingest */
 export function createEventsRoutes(ctx: EngineContext) {
   const app = new Hono()
+
+  // Ingest external events — webhook / API producer surface.
+  // Note: no auth. Currently localhost-only; gate behind a reverse proxy or add
+  // a token check before exposing publicly.
+  app.post('/ingest', async (c) => {
+    let body: unknown
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400)
+    }
+
+    try {
+      validateEventPayload('trigger', body)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return c.json({ error: msg }, 400)
+    }
+
+    const entry = await ctx.eventLog.append('trigger', body as TriggerPayload)
+    return c.json(entry, 201)
+  })
 
   // Paginated query from disk (full history)
   app.get('/', async (c) => {

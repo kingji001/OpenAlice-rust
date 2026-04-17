@@ -112,7 +112,9 @@ export function createCronEngine(opts: CronEngineOpts): CronEngine {
 
   async function save(): Promise<void> {
     await mkdir(dirname(storePath), { recursive: true })
-    const tmp = `${storePath}.${process.pid}.tmp`
+    // Unique tmp filename per call — prevents rename races when save() is
+    // called concurrently (e.g. onTick save vs UI-triggered add/update).
+    const tmp = `${storePath}.${process.pid}.${randomUUID().slice(0, 8)}.tmp`
     await writeFile(tmp, JSON.stringify({ jobs }, null, 2), 'utf-8')
     await rename(tmp, storePath)
   }
