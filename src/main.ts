@@ -43,7 +43,6 @@ import { createListenerRegistry } from './core/listener-registry.js'
 import { createEventBus } from './core/event-bus.js'
 import { createCronEngine, createCronListener, createCronTools } from './task/cron/index.js'
 import { createHeartbeat } from './task/heartbeat/index.js'
-import { createTriggerListener } from './task/trigger/index.js'
 import { createMetricsListener } from './task/metrics/index.js'
 import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
 import { createNewsArchiveTools } from './tool/news.js'
@@ -287,15 +286,6 @@ async function main() {
     console.log(`heartbeat: enabled (every ${config.heartbeat.every})`)
   }
 
-  // ==================== Trigger Listener (external event router) ====================
-
-  const triggerSession = new SessionStore('trigger/default')
-  await triggerSession.restore()
-  const triggerListener = createTriggerListener({
-    connectorCenter, agentCenter, registry: listenerRegistry, session: triggerSession,
-  })
-  await triggerListener.start()
-
   // ==================== Event Metrics (wildcard observer) ====================
 
   const metricsListener = createMetricsListener({ registry: listenerRegistry })
@@ -459,7 +449,6 @@ async function main() {
     newsCollector?.stop()
     snapshotScheduler.stop()
     heartbeat.stop()
-    triggerListener.stop()
     metricsListener.stop()
     cronListener.stop()
     cronEngine.stop()

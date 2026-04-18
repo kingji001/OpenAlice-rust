@@ -12,7 +12,7 @@ export interface SendPayload {
   /** Media attachments (e.g. screenshots from tools). */
   media?: MediaAttachment[]
   /** Where this payload originated from. */
-  source?: 'heartbeat' | 'cron' | 'trigger' | 'manual'
+  source?: 'heartbeat' | 'cron' | 'manual'
 }
 
 /** Result of a send() call. */

@@ -67,27 +67,6 @@ export interface MessageSentPayload {
   durationMs: number
 }
 
-/** Generic external event — used by webhooks, API ingest, or any external producer. */
-export interface TriggerPayload {
-  source: string
-  name: string
-  data: Record<string, unknown>
-}
-
-export interface TriggerDonePayload {
-  source: string
-  name: string
-  reply: string
-  durationMs: number
-}
-
-export interface TriggerErrorPayload {
-  source: string
-  name: string
-  error: string
-  durationMs: number
-}
-
 // ==================== Event Map ====================
 
 // Import the actual CronFirePayload type for use in the map
@@ -102,9 +81,6 @@ export interface AgentEventMap {
   'heartbeat.error': HeartbeatErrorPayload
   'message.received': MessageReceivedPayload
   'message.sent': MessageSentPayload
-  'trigger': TriggerPayload
-  'trigger.done': TriggerDonePayload
-  'trigger.error': TriggerErrorPayload
 }
 
 // ==================== TypeBox Schemas ====================
@@ -160,26 +136,6 @@ const MessageSentSchema = Type.Object({
   durationMs: Type.Number(),
 })
 
-const TriggerSchema = Type.Object({
-  source: Type.String(),
-  name: Type.String(),
-  data: Type.Record(Type.String(), Type.Unknown()),
-})
-
-const TriggerDoneSchema = Type.Object({
-  source: Type.String(),
-  name: Type.String(),
-  reply: Type.String(),
-  durationMs: Type.Number(),
-})
-
-const TriggerErrorSchema = Type.Object({
-  source: Type.String(),
-  name: Type.String(),
-  error: Type.String(),
-  durationMs: Type.Number(),
-})
-
 // ==================== AgentEvents — metadata registry ====================
 
 export interface AgentEventMeta {
@@ -226,19 +182,6 @@ export const AgentEvents: { [K in keyof AgentEventMap]: AgentEventMeta } = {
   'message.sent': {
     schema: MessageSentSchema,
     description: 'An assistant reply was dispatched on a connector.',
-  },
-  'trigger': {
-    schema: TriggerSchema,
-    external: true,
-    description: 'Generic external stimulus (webhook, API ingest). Routed to the AI by trigger-router when no specific type applies.',
-  },
-  'trigger.done': {
-    schema: TriggerDoneSchema,
-    description: 'A trigger event was handled successfully.',
-  },
-  'trigger.error': {
-    schema: TriggerErrorSchema,
-    description: 'Handling a trigger event failed.',
   },
 }
 

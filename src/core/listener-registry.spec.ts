@@ -358,7 +358,7 @@ describe('ListenerRegistry', () => {
       const received: string[] = []
       registry.register({
         name: 'multi',
-        subscribes: ['cron.fire', 'trigger'] as const,
+        subscribes: ['cron.fire', 'message.received'] as const,
         async handle(entry) {
           received.push(entry.type)
         },
@@ -366,25 +366,25 @@ describe('ListenerRegistry', () => {
       await registry.start()
 
       await eventLog.append('cron.fire', { jobId: 'j1', jobName: 'x', payload: 'p' })
-      await eventLog.append('trigger', { source: 's', name: 'n', data: {} })
+      await eventLog.append('message.received', { channel: 'web', to: 'default', prompt: 'hi' })
       await flush()
 
-      expect(received.sort()).toEqual(['cron.fire', 'trigger'])
+      expect(received.sort()).toEqual(['cron.fire', 'message.received'])
     })
 
     it('should narrow entry.payload via discriminated union on entry.type', async () => {
       const seen: Record<string, unknown> = {}
       registry.register({
         name: 'narrow',
-        subscribes: ['cron.fire', 'trigger'] as const,
+        subscribes: ['cron.fire', 'message.received'] as const,
         async handle(entry) {
           // This compiles only because narrowing via switch works
           switch (entry.type) {
             case 'cron.fire':
               seen.jobId = entry.payload.jobId
               break
-            case 'trigger':
-              seen.source = entry.payload.source
+            case 'message.received':
+              seen.channel = entry.payload.channel
               break
           }
         },
@@ -392,18 +392,18 @@ describe('ListenerRegistry', () => {
       await registry.start()
 
       await eventLog.append('cron.fire', { jobId: 'j1', jobName: 'x', payload: 'p' })
-      await eventLog.append('trigger', { source: 'webhook', name: 'n', data: {} })
+      await eventLog.append('message.received', { channel: 'telegram', to: '123', prompt: 'hi' })
       await flush()
 
       expect(seen.jobId).toBe('j1')
-      expect(seen.source).toBe('webhook')
+      expect(seen.channel).toBe('telegram')
     })
 
     it('ctx.subscribes exposes the normalized array', async () => {
       let observed: readonly string[] = []
       registry.register({
         name: 'self-aware',
-        subscribes: ['cron.fire', 'trigger'] as const,
+        subscribes: ['cron.fire', 'message.received'] as const,
         async handle(_entry, ctx) {
           observed = [...ctx.subscribes].sort()
         },
@@ -413,7 +413,7 @@ describe('ListenerRegistry', () => {
       await eventLog.append('cron.fire', { jobId: 'j', jobName: 'x', payload: 'p' })
       await flush()
 
-      expect(observed).toEqual(['cron.fire', 'trigger'])
+      expect(observed).toEqual(['cron.fire', 'message.received'])
     })
   })
 
@@ -432,12 +432,12 @@ describe('ListenerRegistry', () => {
       await registry.start()
 
       await eventLog.append('cron.fire', { jobId: 'j', jobName: 'x', payload: 'p' })
-      await eventLog.append('trigger', { source: 's', name: 'n', data: {} })
+      await eventLog.append('message.received', { channel: 'web', to: 'default', prompt: 'hi' })
       await eventLog.append('heartbeat.skip', { reason: 'test' })
       await flush()
 
       expect(seenTypes.has('cron.fire')).toBe(true)
-      expect(seenTypes.has('trigger')).toBe(true)
+      expect(seenTypes.has('message.received')).toBe(true)
       expect(seenTypes.has('heartbeat.skip')).toBe(true)
     })
 
@@ -469,9 +469,9 @@ describe('ListenerRegistry', () => {
         subscribes: 'cron.fire',
         emits: '*',
         async handle(entry, ctx) {
-          await ctx.emit('trigger.done', {
-            source: 'dynamic',
-            name: entry.payload.jobName,
+          await ctx.emit('cron.done', {
+            jobId: entry.payload.jobId,
+            jobName: entry.payload.jobName,
             reply: 'ok',
             durationMs: 1,
           })
@@ -482,7 +482,7 @@ describe('ListenerRegistry', () => {
       await eventLog.append('cron.fire', { jobId: 'j', jobName: 'x', payload: 'p' })
       await flush()
 
-      const done = eventLog.recent({ type: 'trigger.done' })
+      const done = eventLog.recent({ type: 'cron.done' })
       expect(done).toHaveLength(1)
     })
 
