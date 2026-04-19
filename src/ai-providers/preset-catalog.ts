@@ -198,6 +198,11 @@ export const GLM: PresetDef = {
 
 // ==================== Third-party: Kimi (Moonshot) ====================
 
+// Moonshot officially pushes OpenAI Chat Completions as the primary integration
+// path; we route via their secondary Anthropic-compat endpoint
+// (api.moonshot.*/anthropic) to stay on agent-sdk. Our codex backend speaks
+// the OpenAI Responses API, which Moonshot's direct endpoints do not
+// implement, so codex isn't a viable alternative here.
 export const KIMI: PresetDef = {
   id: 'kimi',
   label: 'Kimi (Moonshot)',
