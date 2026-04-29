@@ -1,5 +1,12 @@
 import { fetchJson } from './client'
-import type { TradingAccount, UTASummary, AccountInfo, Position, WalletCommitLog, ReconnectResult, UTAConfig, WalletStatus, WalletPushResult, WalletRejectResult, TestConnectionResult, BrokerPreset, UTASnapshotSummary, EquityCurvePoint } from './types'
+import type { TradingAccount, UTASummary, AccountInfo, Position, WalletCommitLog, ReconnectResult, UTAConfig, WalletStatus, WalletPushResult, WalletRejectResult, TestConnectionResult, BrokerPreset, UTASnapshotSummary, EquityCurvePoint, PlaceOrderRequest, ClosePositionRequest, CancelOrderRequest, OrderErrorResponse } from './types'
+
+/** Thrown by the one-shot order endpoints when the server returns non-2xx. Carries the phase. */
+export class OrderEntryError extends Error {
+  constructor(public readonly status: number, public readonly response: OrderErrorResponse) {
+    super(response.error)
+  }
+}
 
 /** One contract returned by the broker-side fuzzy search. Shape mirrors what
  *  the AI tool emits — same canonical aliceId for downstream order routing. */
@@ -112,6 +119,24 @@ export const tradingApi = {
     return res.json()
   },
 
+  // ==================== One-shot order entry (manual frontend surface) ====================
+  //
+  // Each call combines stage → commit → push on the backend. Returns
+  // the full WalletPushResult; on failure throws OrderEntryError with
+  // a `phase` indicating which step blew up.
+
+  async placeOrder(utaId: string, body: PlaceOrderRequest): Promise<WalletPushResult> {
+    return postOrder(`/api/trading/uta/${utaId}/wallet/place-order`, body)
+  },
+
+  async closePosition(utaId: string, body: ClosePositionRequest): Promise<WalletPushResult> {
+    return postOrder(`/api/trading/uta/${utaId}/wallet/close-position`, body)
+  },
+
+  async cancelOrder(utaId: string, body: CancelOrderRequest): Promise<WalletPushResult> {
+    return postOrder(`/api/trading/uta/${utaId}/wallet/cancel-order`, body)
+  },
+
   // ==================== Broker Presets ====================
 
   async getBrokerPresets(): Promise<{ presets: BrokerPreset[] }> {
@@ -194,4 +219,19 @@ export const tradingApi = {
     })
     return res.json()
   },
+}
+
+// ==================== Internal helpers ====================
+
+async function postOrder(url: string, body: unknown): Promise<WalletPushResult> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const json = (await res.json().catch(() => ({}))) as OrderErrorResponse
+    throw new OrderEntryError(res.status, { error: json.error ?? `Request failed (${res.status})`, phase: json.phase })
+  }
+  return res.json()
 }

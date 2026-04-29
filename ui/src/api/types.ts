@@ -406,6 +406,52 @@ export interface TestConnectionResult {
   positions?: Position[]
 }
 
+// ==================== Order entry (frontend manual surface) ====================
+//
+// Numeric fields are strings on the wire — the backend uses
+// new Decimal(String(x)) to preserve precision; mirroring the type
+// here keeps frontend → backend aligned and avoids float roundtrip.
+
+export interface PlaceOrderRequest {
+  aliceId: string
+  symbol?: string
+  action: 'BUY' | 'SELL'
+  orderType: string
+  totalQuantity?: string
+  cashQty?: string
+  lmtPrice?: string
+  auxPrice?: string
+  trailStopPrice?: string
+  trailingPercent?: string
+  tif?: string
+  goodTillDate?: string
+  outsideRth?: boolean
+  parentId?: string
+  ocaGroup?: string
+  takeProfit?: { price: string }
+  stopLoss?: { price: string; limitPrice?: string }
+  message: string
+}
+
+export interface ClosePositionRequest {
+  aliceId: string
+  symbol?: string
+  qty?: string
+  message: string
+}
+
+export interface CancelOrderRequest {
+  orderId: string
+  message: string
+}
+
+/** Error response shape from one-shot order endpoints (when status !== 200). */
+export interface OrderErrorResponse {
+  error: string
+  /** Which step blew up — useful for surfacing where the failure happened. */
+  phase?: 'validate' | 'stage' | 'commit' | 'push'
+}
+
 // ==================== Snapshots ====================
 
 export interface UTASnapshotSummary {

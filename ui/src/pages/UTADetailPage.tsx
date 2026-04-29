@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import type { UTAConfig, BrokerPreset, AccountInfo, Position, BrokerHealthInfo, UTASnapshotSummary } from '../api/types'
 import { useTradingConfig } from '../hooks/useTradingConfig'
@@ -10,12 +10,14 @@ import { ReconnectButton } from '../components/ReconnectButton'
 import { Toggle } from '../components/Toggle'
 import { HealthBadge } from '../components/uta/HealthBadge'
 import { EditUTADialog } from '../components/uta/EditUTADialog'
+import { OrderEntryDialog, type OrderEntryMode } from '../components/uta/OrderEntryDialog'
 import { SnapshotDetail } from '../components/SnapshotDetail'
 
 // ==================== Page ====================
 
 export function UTADetailPage() {
   const { id } = useParams<{ id: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const tc = useTradingConfig()
   const healthMap = useAccountHealth()
@@ -26,6 +28,7 @@ export function UTADetailPage() {
   const [snapshots, setSnapshots] = useState<UTASnapshotSummary[]>([])
   const [selectedSnapshot, setSelectedSnapshot] = useState<UTASnapshotSummary | null>(null)
   const [editing, setEditing] = useState(false)
+  const [orderMode, setOrderMode] = useState<OrderEntryMode | null>(null)
   const [dataError, setDataError] = useState<string | null>(null)
 
   // Preset metadata (stable across renders)
@@ -74,6 +77,19 @@ export function UTADetailPage() {
     return () => { clearInterval(liveInterval); clearInterval(snapshotInterval) }
   }, [refreshLive, refreshSnapshots])
 
+  // URL query param `?aliceId=...` (e.g. clicked from
+  // TradeableContractsPanel) auto-opens the place-order form prefilled.
+  useEffect(() => {
+    const queryAlice = searchParams.get('aliceId')
+    if (queryAlice && !orderMode) {
+      setOrderMode({ kind: 'place', aliceId: queryAlice })
+      // Clear the param so back/forward + reopen behave sensibly.
+      const next = new URLSearchParams(searchParams)
+      next.delete('aliceId')
+      setSearchParams(next, { replace: true })
+    }
+  }, [searchParams, setSearchParams, orderMode])
+
   if (tc.loading) return <Shell title="Loading…" />
 
   if (!id) return <Shell title="UTA not specified" />
@@ -114,6 +130,13 @@ export function UTADetailPage() {
               onChange={async (v) => { await tc.saveUTA({ ...uta, enabled: v }) }}
             />
             <ReconnectButton accountId={uta.id} />
+            <button
+              onClick={() => setOrderMode({ kind: 'place' })}
+              disabled={isDisabled}
+              className="px-3 py-1.5 text-[13px] font-medium rounded-md bg-accent text-bg hover:bg-accent/90 disabled:opacity-40 transition-colors"
+            >
+              + Place Order
+            </button>
             <button onClick={() => setEditing(true)} className="px-3 py-1.5 text-[13px] font-medium rounded-md border border-border hover:bg-bg-tertiary transition-colors">
               Edit
             </button>
@@ -132,7 +155,15 @@ export function UTADetailPage() {
           <HeroMetrics account={account} />
 
           {positions.length > 0 ? (
-            <PositionsTable positions={positions} />
+            <PositionsTable
+              positions={positions}
+              onCloseClick={(p) => setOrderMode({
+                kind: 'close',
+                aliceId: p.contract.aliceId ?? p.contract.localSymbol ?? p.contract.symbol ?? '',
+                quantity: p.quantity,
+                symbol: p.contract.symbol,
+              })}
+            />
           ) : (
             <EmptyState title="No open positions." />
           )}
@@ -159,6 +190,17 @@ export function UTADetailPage() {
             navigate('/trading')
           }}
           onClose={() => setEditing(false)}
+        />
+      )}
+
+      {orderMode && (
+        <OrderEntryDialog
+          utaId={uta.id}
+          mode={orderMode}
+          onClose={() => setOrderMode(null)}
+          // Trigger an immediate refresh so the new order/position
+          // shows up without waiting for the 15s polling tick.
+          onPushComplete={() => { void refreshLive() }}
         />
       )}
     </div>
@@ -213,7 +255,10 @@ function Metric({ label, value, pnl }: { label: string; value: string; pnl?: num
 
 // ==================== Positions Table ====================
 
-function PositionsTable({ positions }: { positions: Position[] }) {
+function PositionsTable({ positions, onCloseClick }: {
+  positions: Position[]
+  onCloseClick: (p: Position) => void
+}) {
   return (
     <div>
       <h3 className="text-[13px] font-semibold text-text-muted uppercase tracking-wide mb-3">
@@ -232,6 +277,7 @@ function PositionsTable({ positions }: { positions: Position[] }) {
               <th className="px-3 py-2 font-medium text-right">Mkt Value</th>
               <th className="px-3 py-2 font-medium text-right">PnL</th>
               <th className="px-3 py-2 font-medium text-right">PnL %</th>
+              <th className="px-3 py-2 font-medium text-right" />
             </tr>
           </thead>
           <tbody>
@@ -261,6 +307,14 @@ function PositionsTable({ positions }: { positions: Position[] }) {
                   </td>
                   <td className={`px-3 py-2 text-right ${pnl >= 0 ? 'text-green' : 'text-red'}`}>
                     {`${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <button
+                      onClick={() => onCloseClick(p)}
+                      className="text-[11px] text-text-muted hover:text-red transition-colors"
+                    >
+                      Close
+                    </button>
                   </td>
                 </tr>
               )

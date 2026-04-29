@@ -1,10 +1,97 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
+import { z } from 'zod'
 import type { EngineContext } from '../../../core/types.js'
 import { BrokerError } from '../../../domain/trading/brokers/types.js'
 import type { UnifiedTradingAccount } from '../../../domain/trading/UnifiedTradingAccount.js'
 import { searchTradeableContracts } from '../../../domain/trading/contract-search.js'
 import type { AssetClassHint } from '../../../domain/trading/contract-search-rules.js'
+
+// ==================== Order entry schemas ====================
+//
+// All numeric fields use string on the wire (matching the
+// new Decimal(String(x)) pattern in UnifiedTradingAccount.ts) — keeps
+// frontend/backend aligned on Decimal precision and avoids IEEE-754
+// rounding artifacts in JSON serialization.
+
+const numericString = z.string().min(1)
+const message = z.string().min(1, { message: 'Commit message is required' })
+
+const placeOrderSchema = z.object({
+  aliceId: z.string().min(1),
+  symbol: z.string().optional(),
+  action: z.enum(['BUY', 'SELL']),
+  orderType: z.string().min(1),
+  totalQuantity: numericString.optional(),
+  cashQty: numericString.optional(),
+  lmtPrice: numericString.optional(),
+  auxPrice: numericString.optional(),
+  trailStopPrice: numericString.optional(),
+  trailingPercent: numericString.optional(),
+  tif: z.string().optional(),
+  goodTillDate: z.string().optional(),
+  outsideRth: z.boolean().optional(),
+  parentId: z.string().optional(),
+  ocaGroup: z.string().optional(),
+  takeProfit: z.object({ price: numericString }).optional(),
+  stopLoss: z.object({ price: numericString, limitPrice: numericString.optional() }).optional(),
+  message,
+}).refine(
+  (d) => d.totalQuantity != null || d.cashQty != null,
+  { message: 'Either totalQuantity or cashQty is required' },
+)
+
+const closePositionSchema = z.object({
+  aliceId: z.string().min(1),
+  symbol: z.string().optional(),
+  qty: numericString.optional(),
+  message,
+})
+
+const cancelOrderSchema = z.object({
+  orderId: z.string().min(1),
+  message,
+})
+
+/**
+ * Combine stage → commit → push into one HTTP roundtrip. The
+ * underlying TradingGit phases stay separate; this is a route-layer
+ * convenience for the frontend's manual order entry surface. Returns
+ * the full PushResult (including per-op submitted/rejected breakdown
+ * with fills + errors) so the user can see async behavior end-to-end.
+ *
+ * On error, the response carries `phase` so the frontend can label
+ * which step failed (stage → guards bounced; commit → invalid state;
+ * push → broker exception before any per-op result).
+ */
+async function executeOneShot<T>(
+  c: Context,
+  uta: UnifiedTradingAccount,
+  message: string,
+  stage: () => T,
+): Promise<Response> {
+  // Stage
+  try {
+    stage()
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err), phase: 'stage' }, 400)
+  }
+  // Commit
+  try {
+    uta.commit(message)
+  } catch (err) {
+    // Roll back the staging area so the next attempt starts clean.
+    try { await uta.reject('auto-rollback after commit error') } catch { /* best effort */ }
+    return c.json({ error: err instanceof Error ? err.message : String(err), phase: 'commit' }, 400)
+  }
+  // Push
+  try {
+    const result = await uta.push()
+    return c.json(result)
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err), phase: 'push' }, 500)
+  }
+}
 
 const ALLOWED_ASSET_CLASSES: ReadonlySet<AssetClassHint> = new Set([
   'equity', 'crypto', 'currency', 'commodity', 'unknown',
@@ -215,6 +302,57 @@ export function createTradingRoutes(ctx: EngineContext) {
     } catch (err) {
       return c.json({ error: String(err) }, 500)
     }
+  })
+
+  // ==================== One-shot order entry ====================
+  //
+  // Combine stage → commit → push for the frontend's manual order
+  // surface. The TradingGit primitives stay separate underneath; this
+  // is a route-layer convenience.
+
+  app.post('/uta/:id/wallet/place-order', async (c) => {
+    const uta = ctx.utaManager.get(c.req.param('id'))
+    if (!uta) return c.json({ error: 'UTA not found' }, 404)
+    let body: z.infer<typeof placeOrderSchema>
+    try {
+      body = placeOrderSchema.parse(await c.req.json())
+    } catch (err) {
+      return c.json({ error: err instanceof z.ZodError ? err.message : String(err), phase: 'validate' }, 400)
+    }
+    return executeOneShot(c, uta, body.message, () => {
+      const { message: _msg, ...stageParams } = body
+      uta.stagePlaceOrder(stageParams)
+    })
+  })
+
+  app.post('/uta/:id/wallet/close-position', async (c) => {
+    const uta = ctx.utaManager.get(c.req.param('id'))
+    if (!uta) return c.json({ error: 'UTA not found' }, 404)
+    let body: z.infer<typeof closePositionSchema>
+    try {
+      body = closePositionSchema.parse(await c.req.json())
+    } catch (err) {
+      return c.json({ error: err instanceof z.ZodError ? err.message : String(err), phase: 'validate' }, 400)
+    }
+    return executeOneShot(c, uta, body.message, () => {
+      const { message: _msg, ...stageParams } = body
+      // qty stays a string all the way to Decimal — no float roundtrip.
+      uta.stageClosePosition(stageParams)
+    })
+  })
+
+  app.post('/uta/:id/wallet/cancel-order', async (c) => {
+    const uta = ctx.utaManager.get(c.req.param('id'))
+    if (!uta) return c.json({ error: 'UTA not found' }, 404)
+    let body: z.infer<typeof cancelOrderSchema>
+    try {
+      body = cancelOrderSchema.parse(await c.req.json())
+    } catch (err) {
+      return c.json({ error: err instanceof z.ZodError ? err.message : String(err), phase: 'validate' }, 400)
+    }
+    return executeOneShot(c, uta, body.message, () => {
+      uta.stageCancelOrder({ orderId: body.orderId })
+    })
   })
 
   // ==================== Snapshot routes ====================

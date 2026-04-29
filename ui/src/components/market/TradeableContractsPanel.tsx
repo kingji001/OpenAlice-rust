@@ -133,6 +133,12 @@ function byInstrumentFamiliarity(a: ContractSearchHit, b: ContractSearchHit): nu
 function ContractRow({ hit }: { hit: ContractSearchHit }) {
   const c = hit.contract
   const aliceId = c.aliceId as string | undefined
+  // Bridge to the UTA detail page's order entry — clicking jumps the
+  // user from "I see this contract on this UTA" to "place an order
+  // against it" with the alice id pre-filled.
+  const orderHref = aliceId
+    ? `/uta/${encodeURIComponent(hit.source)}?aliceId=${encodeURIComponent(aliceId)}`
+    : null
   return (
     <li className="px-3 py-2 flex items-baseline gap-3 text-[12px] hover:bg-bg-tertiary/40 transition-colors">
       <span className="font-mono font-semibold text-text">{c.symbol ?? '—'}</span>
@@ -154,6 +160,15 @@ function ContractRow({ hit }: { hit: ContractSearchHit }) {
         >
           {aliceId}
         </code>
+      )}
+      {orderHref && (
+        <Link
+          to={orderHref}
+          className="text-[11px] text-accent hover:underline shrink-0"
+          title="Open order entry on the UTA"
+        >
+          Order →
+        </Link>
       )}
     </li>
   )
