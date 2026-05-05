@@ -10,6 +10,7 @@
 
 import { TradingGit } from '../src/domain/trading/git/TradingGit.js'
 import type { Operation, OperationResult, GitState } from '../src/domain/trading/git/types.js'
+import { UNSET_DECIMAL } from '@traderalice/ibkr'
 
 export interface StubPolicy {
   /** Returns the OperationResult for a given Operation about to be executed. */
@@ -50,7 +51,7 @@ export class DefaultStubPolicy implements StubPolicy {
     if (op.action === 'placeOrder') {
       const filledQty = op.order.totalQuantity?.toString() ?? '0'
       // Use lmtPrice if set; otherwise fall back to 100.
-      const filledPrice = op.order.lmtPrice && op.order.lmtPrice.toString() !== '0'
+      const filledPrice = op.order.lmtPrice && !op.order.lmtPrice.equals(UNSET_DECIMAL) && !op.order.lmtPrice.isZero()
         ? op.order.lmtPrice.toString()
         : '100'
       return { action: 'placeOrder', success: true, orderId, status: 'filled', filledQty, filledPrice }
