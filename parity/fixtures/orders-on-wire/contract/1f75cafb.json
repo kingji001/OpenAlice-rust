@@ -1,0 +1,23 @@
+{
+  "conId": 0,
+  "symbol": "AAPL",
+  "secType": "STK",
+  "lastTradeDateOrContractMonth": "",
+  "lastTradeDate": "",
+  "strike": 1.7976931348623157e+308,
+  "right": "",
+  "multiplier": "",
+  "exchange": "SMART",
+  "primaryExchange": "",
+  "currency": "USD",
+  "localSymbol": "",
+  "tradingClass": "",
+  "includeExpired": false,
+  "secIdType": "",
+  "secId": "",
+  "description": "",
+  "issuerId": "",
+  "comboLegsDescrip": "",
+  "comboLegs": [],
+  "deltaNeutralContract": null
+}
