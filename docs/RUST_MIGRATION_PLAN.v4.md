@@ -343,6 +343,9 @@ Phase 1 ships in three sub-PRs to keep concept boundaries clean:
 2. `packages/ibkr-client/` — connection, reader, decoder, request bridge, protobuf wrappers.
 3. `packages/ibkr/` becomes a re-export shim that re-exports from both new packages, kept for one minor release for back-compat.
 4. **No callers change.** Existing `import { Order } from '@traderalice/ibkr'` continues to work via the shim.
+5. **Acknowledge decoder→DTO coupling.** `decoder/execution.ts:43,89,140,157`, `decoder/account.ts:47,103,220,325`, `decoder/contract.ts:116,181` all do `new Contract()` / `new Execution()` / `new ContractDetails()`. So `ibkr-client` takes a **value-level** dep on `ibkr-types` (not type-only). Document explicitly in the package READMEs.
+6. **Move `order-decoder.ts`** from `packages/ibkr/src/order-decoder.ts` into `packages/ibkr-client/src/decoder/order.ts`. v3's "mechanical" framing missed this file.
+7. **Decision recorded:** `Order` / `Contract` / `ContractDetails` / `ContractDescription` stay as classes (not interfaces) — the decoder constructs and mutates them imperatively. Refactor to interfaces is a separate non-mechanical change, out of scope for Phase 1a.
 
 **DoD:**
 
@@ -353,7 +356,7 @@ pnpm dev                                     # boots, smoke check
 git ls-files packages/ibkr/src                                # only re-exports
 ```
 
-**Cutover gate:** none — purely mechanical refactor.
+**Cutover gate:** none. **Note:** the refactor is *conceptually* a split but not *mechanically* clean — see Deliverable 5 for the decoder coupling acknowledgement.
 
 **Rollback:** revert. Trivial.
 
@@ -395,6 +398,7 @@ git ls-files packages/ibkr/src                                # only re-exports
 3. Round-trip test: every fixture in `parity/fixtures/orders-on-wire/` and `parity/fixtures/sentinels/` round-trips.
 
 4. **`TradingGit` continues to use the legacy hashing path on the live route.** Wire types are added but unused on the live path until Phase 2.
+5. **`UNSET_LONG` precision fixture.** `packages/ibkr/src/const.ts:12` defines `UNSET_LONG = BigInt(2 ** 63) - 1n`. The `2 ** 63` is computed as a JS Number, exceeding `Number.MAX_SAFE_INTEGER` and rounding. If any IBKR field maps to Rust `i64`, the wire-type design must reconstruct `i64::MAX` canonically (not from the lossy TS source). Phase 1b adds a fixture asserting exact `i64::MAX` round-trip for any such field. See §6.1 caveats.
 
 **DoD:**
 
@@ -520,7 +524,12 @@ npx tsc --noEmit
    }
    ```
 
-3. **`TradingGit.commit()` writes both:** picks `hashInputTimestamp = new Date().toISOString()`, computes v2 hash, **persists `hashInputTimestamp` on the resulting commit**, sets `hashVersion: 2`. **`push()` uses the timestamp captured at `commit()`, not a new one** — fixes the latent bug where [TradingGit.ts:69](../src/domain/trading/git/TradingGit.ts:69) and [TradingGit.ts:124](../src/domain/trading/git/TradingGit.ts:124) used different timestamps.
+3. **`hashInputTimestamp` captured at intent site, reused by every downstream write of the same commit.** v3 said "fix at commit/push"; the desync also exists at `reject()` ([TradingGit.ts:172](../src/domain/trading/git/TradingGit.ts:172)) and `sync()` ([TradingGit.ts:386, :404](../src/domain/trading/git/TradingGit.ts:386)). v4 fixes **all four** sites:
+   - `commit()` ([TradingGit.ts:69](../src/domain/trading/git/TradingGit.ts:69)) — picks `hashInputTimestamp = new Date().toISOString()`, computes v2 hash, **persists `hashInputTimestamp` on the resulting commit**, sets `hashVersion: 2`.
+   - `push()` ([TradingGit.ts:124](../src/domain/trading/git/TradingGit.ts:124)) — uses the timestamp captured at `commit()`, not a new one.
+   - `reject()` ([TradingGit.ts:172](../src/domain/trading/git/TradingGit.ts:172)) — captures its own `hashInputTimestamp` at the rejection-intent moment; downstream persistence reuses it.
+   - `sync()` ([TradingGit.ts:386, :404](../src/domain/trading/git/TradingGit.ts:386)) — same pattern.
+   Fixtures cover all four sites for timestamp consistency.
 
 4. **Mixed-version log loader** in `src/domain/trading/git/persisted-commit.ts`:
    ```typescript
@@ -728,9 +737,12 @@ pnpm dev
    ```
    Generated `index.d.ts` checked into repo; CI fails on drift.
 
+   **FFI callback contract.** `TradingGitConfig` carries three callbacks the constructor accepts ([interfaces.ts:55-59](../src/domain/trading/git/interfaces.ts:55)): `executeOperation: (op) => Promise<unknown>` (broker dispatcher), `getGitState: () => Promise<GitState>` (broker state pull), `onCommit?: (state) => Promise<void>` (persistence hook). v4 chooses **Option A**: orchestrate push/commit in Rust; the three callbacks become typed napi method signatures (`broker_execute_operation`, `broker_get_state`, `commit_persisted_notify`). Rust calls TS only via these three. (Option B — orchestrate in TS, Rust holds only data — was rejected for FFI chatter.)
+
 7. `parity/run-rust` — Rust-side fixture runner.
 
 8. CI: `.github/workflows/parity.yml` diffs `parity/run-ts` and `parity/run-rust` outputs.
+9. **Rehydration belongs in TS.** `Order` rehydration in `_rehydrateOperation` ([TradingGit.ts:312-371](../src/domain/trading/git/TradingGit.ts:312)) is broker-shape-aware (Decimal field-by-field rewrap of IBKR `Order`). Rust ports the rehydration logic as `WireOrder → WireOrder` round-trip; broker-class rehydration (`new Order()` + `Decimal(...)` field rewrap) belongs in the TS proxy layer (Phase 4f), not in Rust.
 
 **DoD:**
 
@@ -863,6 +875,14 @@ pnpm test:e2e                                    # existing tests still pass thr
    ```
    Test asserts `err instanceof BrokerError === true` after FFI crossing.
 
+5. **Port `BrokerError.classifyMessage()`** ([brokers/types.ts:45-59](../src/domain/trading/brokers/types.ts:45)). Regex-based error-message classifier (network-timeout, auth-rejected, etc.) called by today's broker impls to populate `code`. Replicate verbatim in Rust with fixture coverage; revisit cleanup post-Phase-7.
+
+6. **Rationalize offline-push error shape.** `UnifiedTradingAccount.push()` ([:421-431](../src/domain/trading/UnifiedTradingAccount.ts:421)) throws plain `Error`, not `BrokerError`, when `_disabled` or `health === 'offline'`. Rust port throws `BrokerError(CONFIG, "account disabled", permanent: true)` and `BrokerError(NETWORK, "account offline", permanent: false)` respectively. Mirror the change in TS in the same PR.
+
+7. **MockBroker port preserves five behaviors as explicit parity assertions** (not "behavioral parity" hand-wave): deterministic order ID counter; exact avg-cost recalc semantics including the "flipped position simplification" at [MockBroker.ts:527-529](../src/domain/trading/brokers/mock/MockBroker.ts:527); fail-injection machinery (`setFailMode`); call-log shape (`_callLog` / `calls()` / `callCount()` / `lastCall()`); failure-mode triggering of health transitions.
+
+8. **BrokerCapabilities extension point on the `Broker` trait** (forward-compat for §4.4). Trait carries `fn capabilities(&self) -> BrokerCapabilities` returning `{ closeMode: { partial | wholePosition }, orderTypes: bitflags, signingScheme: { none | eip712 | ... } }`. Default impl returns `{ partial, market | limit | stop | bracket, none }` — current brokers (IBKR, Alpaca, Mock) satisfy the default and don't override. If §4.4 ever flips, LeverUp overrides; no trait-shape rework. No behavior change in Phase 4b.
+
 **DoD:**
 
 ```bash
@@ -882,8 +902,9 @@ pnpm tsx parity/check-mock-broker.ts             # Mock broker behavior parity
 **Deliverable:**
 
 1. `Guard` trait + `cooldown.rs`, `max_position_size.rs`, `symbol_whitelist.rs`. Configuration uses `#[serde(deny_unknown_fields)]` **but emits warnings instead of errors** during the warn-only window (§6.8).
-2. `GuardPipeline::wrap(dispatcher, broker, guards)` matching TS factory at [guard-pipeline.ts:13](../src/domain/trading/guards/guard-pipeline.ts:13). Pre-fetches `[positions, account]` outside the loop, identical to TS.
+2. `create_guard_pipeline(dispatcher, broker, guards)` matching TS factory at [guard-pipeline.ts:13-37](../src/domain/trading/guards/guard-pipeline.ts:13). The TS function is `createGuardPipeline` (no class). **Pre-fetch is per-op, not per-push** — `[positions, account]` is fetched inside the returned `async (op)` closure. Rust port matches per-op timing. **Do NOT optimize to per-push** during the port — it would silently change guard semantics if a guard depends on positions changing between ops.
 3. Parity fixtures + checker.
+4. **Per-op pre-fetch parity test.** A 5-op push verifies `[positions, account]` is fetched **5 times** (not 1). Asserts on the broker mock's call log.
 
 **DoD:**
 
@@ -935,6 +956,12 @@ pnpm tsx parity/check-guards.ts             # 50+ scenarios identical TS↔Rust
 3. **Missing-snapshot reconciler** at boot — closes the gap noted in §6.4. Scans `data/trading/<accountId>/commit.json` against `data/snapshots/<accountId>/` and triggers a snapshot for any commit without one.
 
 4. Integration test: full Mock-backed UTA lifecycle via the actor.
+
+5. **Snapshot trigger swap.** `UnifiedTradingAccount.ts:429` calls `Promise.resolve(this._onPostPush?.(this.id)).catch(() => {})` directly after `git.push()` — **inline callback, not event-based**. v4 deliverable: remove `setSnapshotHooks` from `UTAManager` ([uta-manager.ts:103-104](../src/domain/trading/uta-manager.ts:103)); snapshot service subscribes to `commit.notify` from EventLog instead. Cross-reference §6.4.1 for the durability-asymmetry note. Atomicity test: assert no missed snapshot during the swap window.
+
+6. **Runtime UTA add/remove via HTTP.** Per-UTA actor lifecycle handlers: `spawn(account_config) -> UtaHandle`; `teardown(uta_id) -> ()` drains the mpsc, joins the tokio task, releases tsfn. **Round-trip integration test: 100 cycles of spawn → command → teardown without resource leak** (file descriptors, tokio tasks, tsfn handles). Driven from existing HTTP routes: `PUT /uta/:id` ([trading-config.ts:74](../src/connectors/web/routes/trading-config.ts:74)), `DELETE /uta/:id` ([:119](../src/connectors/web/routes/trading-config.ts:119)), `POST /uta/:id/reconnect` ([trading.ts:204](../src/connectors/web/routes/trading.ts:204)).
+
+7. **Reconnect ownership matrix wiring** (cross-reference §6.5.1). For Rust-backed UTAs, recovery loop runs in the actor; emits `account.health` via the bounded mpsc channel. tsfn re-registration on `reconnectUTA` recreate. Phase 4d parity test: TS-CCXT and Rust-Mock produce equivalent `account.health` event sequences for an identical disconnect scenario.
 
 **DoD:**
 
@@ -1103,6 +1130,12 @@ pnpm tsx parity/check-journal-mock.ts
    - On shutdown: drain channel, then unref.
 
 5. Mock-broker e2e via the proxy, end-to-end through the Web UI.
+
+6. **`commit.notify` schema registration.** `commit.notify` is a **net-new event** (zero hits in current `src/`). v4 registers `commit.notify` and any other Rust-emitted trading event in `AgentEventMap` ([src/core/agent-event.ts:91-103](../src/core/agent-event.ts:91)) with TypeBox schemas. Reconcile per-UTA monotonic Rust seq with EventLog's global seq ([event-log.ts:136-138](../src/core/event-log.ts:136)) — separate counters; the proxy emits both.
+
+7. **Telegram smoke test.** [telegram-plugin.ts:111-194](../src/connectors/telegram/telegram-plugin.ts:111) calls `uta.push()` ([:163](../src/connectors/telegram/telegram-plugin.ts:163)) and `uta.reject()` ([:166](../src/connectors/telegram/telegram-plugin.ts:166)) on `bot.command('trading')` callbacks. Phase 4f DoD: a `/trading` command flow round-trips through `RustUtaProxy` end-to-end within ≤10s (Telegram callback timeout).
+
+8. **Rust panic injection test** (`parity/check-rust-panic.ts`). Inject a panic into the Mock broker's place_order; verify TS-side error shape (`code === 'RUST_PANIC'`), recovery (UTA marked offline → respawn), and that other UTAs are unaffected.
 
 **DoD:**
 
