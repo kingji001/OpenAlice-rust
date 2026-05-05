@@ -49,7 +49,11 @@ export class DefaultStubPolicy implements StubPolicy {
     this.callIndex++
     const orderId = `mock-${this.callIndex}`
     if (op.action === 'placeOrder') {
-      const filledQty = op.order.totalQuantity?.toString() ?? '0'
+      // Order.totalQuantity defaults to UNSET_DECIMAL when unset, not undefined.
+      // Mirror the lmtPrice sentinel guard.
+      const filledQty = op.order.totalQuantity && !op.order.totalQuantity.equals(UNSET_DECIMAL)
+        ? op.order.totalQuantity.toString()
+        : '0'
       // Use lmtPrice if set; otherwise fall back to 100.
       const filledPrice = op.order.lmtPrice && !op.order.lmtPrice.equals(UNSET_DECIMAL) && !op.order.lmtPrice.isZero()
         ? op.order.lmtPrice.toString()
