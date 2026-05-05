@@ -80,6 +80,7 @@ Source: `packages/ibkr/src/order.ts`.
 | `referenceContractId` | `number` | value-only | `WireInteger` | 0 = none; PEG2BENCH field |
 | `peggedChangeAmount` | `number` | value-only | `WireDouble` | 0.0 = none; PEG2BENCH field |
 | `referenceChangeAmount` | `number` | value-only | `WireDouble` | 0.0 = none; PEG2BENCH field |
+| `refFuturesConId` | `number` | value-only | `WireInteger` | 0 = none; PEG2BENCH field |
 | `triggerPrice` | `number` | value-or-unset | `WireDouble` | Default `UNSET_DOUBLE`; adjusted orders |
 | `adjustedStopPrice` | `number` | value-or-unset | `WireDouble` | Default `UNSET_DOUBLE`; adjusted orders |
 | `adjustedStopLimitPrice` | `number` | value-or-unset | `WireDouble` | Default `UNSET_DOUBLE`; adjusted orders |
@@ -101,7 +102,7 @@ Source: `packages/ibkr/src/order.ts`.
 | `slOrderId` | `number` | value-or-unset | `WireInteger` | Default `UNSET_INTEGER`; attached stop-loss order |
 | `ptOrderId` | `number` | value-or-unset | `WireInteger` | Default `UNSET_INTEGER`; attached profit-taker order |
 
-**Field count:** 62 numeric fields. **Sentinel-bearing:** 45 (7 Decimal, 38 number).
+**Field count:** 64 numeric fields. **Sentinel-bearing:** 44 (7 Decimal, 37 number).
 
 ---
 
@@ -237,7 +238,7 @@ Source: `src/domain/trading/git/types.ts`.
 
 | Type | Field count | Sentinel-bearing | value-only | computed-only |
 |---|---|---|---|---|
-| Order | 62 | 45 | 17 | 0 |
+| Order | 64 | 44 | 20 | 0 |
 | Contract | 14 | 7 | 7 | 0 |
 | Execution | 10 | 2 | 8 | 0 |
 | OrderState | 13 | 13 | 0 | 0 |
@@ -246,8 +247,8 @@ Source: `src/domain/trading/git/types.ts`.
 | GitState | 4 | 0 | 4 | 0 |
 | OperationResult | 2 | 0 | 0 | 0 |
 
-**Total numeric fields across all types:** 113  
-**Total sentinel-bearing fields:** 67
+**Total numeric fields across all types:** 115  
+**Total sentinel-bearing fields:** 66
 
 ## Wire-type recommendations for Phase 1b
 
