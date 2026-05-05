@@ -881,7 +881,7 @@ pnpm test:e2e                                    # existing tests still pass thr
 
 7. **MockBroker port preserves five behaviors as explicit parity assertions** (not "behavioral parity" hand-wave): deterministic order ID counter; exact avg-cost recalc semantics including the "flipped position simplification" at [MockBroker.ts:527-529](../src/domain/trading/brokers/mock/MockBroker.ts:527); fail-injection machinery (`setFailMode`); call-log shape (`_callLog` / `calls()` / `callCount()` / `lastCall()`); failure-mode triggering of health transitions.
 
-8. **BrokerCapabilities extension point on the `Broker` trait** (forward-compat for §4.4). Trait carries `fn capabilities(&self) -> BrokerCapabilities` returning `{ closeMode: { partial | wholePosition }, orderTypes: bitflags, signingScheme: { none | eip712 | ... } }`. Default impl returns `{ partial, market | limit | stop | bracket, none }` — current brokers (IBKR, Alpaca, Mock) satisfy the default and don't override. If §4.4 ever flips, LeverUp overrides; no trait-shape rework. No behavior change in Phase 4b.
+8. **`BrokerCapabilities` extension point on the `Broker` trait** (forward-compat for §4.4). Trait carries `fn capabilities(&self) -> BrokerCapabilities` returning `{ closeMode: { partial | wholePosition }, orderTypes: bitflags, signingScheme: { none | eip712 | ... } }`. Default impl returns `{ partial, market | limit | stop | bracket, none }` — current brokers (IBKR, Alpaca, Mock) satisfy the default and don't override. If §4.4 ever flips, LeverUp overrides; no trait-shape rework. No behavior change in Phase 4b.
 
 **DoD:**
 
