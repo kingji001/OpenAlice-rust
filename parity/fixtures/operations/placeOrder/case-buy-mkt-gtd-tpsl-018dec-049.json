@@ -1,0 +1,22 @@
+{
+  "name": "case-buy-mkt-gtd-tpsl-018dec-049",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "orderType": "MKT",
+      "tif": "GTD",
+      "totalQuantity": "0.123456789012345678"
+    },
+    "tpsl": {
+      "stopLoss": "140.0",
+      "takeProfit": "160.0"
+    }
+  }
+}

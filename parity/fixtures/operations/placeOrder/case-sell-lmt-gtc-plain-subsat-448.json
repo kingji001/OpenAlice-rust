@@ -1,0 +1,19 @@
+{
+  "name": "case-sell-lmt-gtc-plain-subsat-448",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "SELL",
+      "lmtPrice": "0.000000001",
+      "orderType": "LMT",
+      "tif": "GTC",
+      "totalQuantity": "0.000000001"
+    }
+  }
+}

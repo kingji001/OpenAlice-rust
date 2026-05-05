@@ -1,0 +1,19 @@
+{
+  "name": "case-buy-lmt-day-plain-018dec-076",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "lmtPrice": "0.123456789012345678",
+      "orderType": "LMT",
+      "tif": "DAY",
+      "totalQuantity": "0.123456789012345678"
+    }
+  }
+}

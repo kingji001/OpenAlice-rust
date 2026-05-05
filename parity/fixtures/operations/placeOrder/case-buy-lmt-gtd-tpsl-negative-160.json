@@ -1,0 +1,23 @@
+{
+  "name": "case-buy-lmt-gtd-tpsl-negative-160",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "lmtPrice": "-150.5",
+      "orderType": "LMT",
+      "tif": "GTD",
+      "totalQuantity": "-100"
+    },
+    "tpsl": {
+      "stopLoss": "140.0",
+      "takeProfit": "160.0"
+    }
+  }
+}

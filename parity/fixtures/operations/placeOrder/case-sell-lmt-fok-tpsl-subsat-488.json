@@ -1,0 +1,23 @@
+{
+  "name": "case-sell-lmt-fok-tpsl-subsat-488",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "SELL",
+      "lmtPrice": "0.000000001",
+      "orderType": "LMT",
+      "tif": "FOK",
+      "totalQuantity": "0.000000001"
+    },
+    "tpsl": {
+      "stopLoss": "140.0",
+      "takeProfit": "160.0"
+    }
+  }
+}

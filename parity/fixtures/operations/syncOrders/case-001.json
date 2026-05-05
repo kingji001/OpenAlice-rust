@@ -1,0 +1,6 @@
+{
+  "name": "case-001",
+  "operation": {
+    "action": "syncOrders"
+  }
+}

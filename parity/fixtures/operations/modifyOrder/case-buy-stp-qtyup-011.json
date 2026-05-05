@@ -1,0 +1,10 @@
+{
+  "name": "case-buy-stp-qtyup-011",
+  "operation": {
+    "action": "modifyOrder",
+    "changes": {
+      "totalQuantity": "200"
+    },
+    "orderId": "mock-existing-011"
+  }
+}

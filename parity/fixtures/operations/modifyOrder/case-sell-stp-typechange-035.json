@@ -1,0 +1,10 @@
+{
+  "name": "case-sell-stp-typechange-035",
+  "operation": {
+    "action": "modifyOrder",
+    "changes": {
+      "orderType": "LMT"
+    },
+    "orderId": "mock-existing-035"
+  }
+}

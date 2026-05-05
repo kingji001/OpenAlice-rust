@@ -1,0 +1,20 @@
+{
+  "name": "case-sell-stplmt-ioc-plain-subsat-640",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "SELL",
+      "auxPrice": "0.000000001",
+      "lmtPrice": "0.000000001",
+      "orderType": "STP LMT",
+      "tif": "IOC",
+      "totalQuantity": "0.000000001"
+    }
+  }
+}

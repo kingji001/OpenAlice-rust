@@ -1,0 +1,7 @@
+{
+  "name": "case-plain-expired-004",
+  "operation": {
+    "action": "cancelOrder",
+    "orderId": "mock-existing-004"
+  }
+}

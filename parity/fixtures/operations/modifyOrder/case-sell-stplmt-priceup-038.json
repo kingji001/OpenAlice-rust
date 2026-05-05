@@ -1,0 +1,10 @@
+{
+  "name": "case-sell-stplmt-priceup-038",
+  "operation": {
+    "action": "modifyOrder",
+    "changes": {
+      "lmtPrice": "160.5"
+    },
+    "orderId": "mock-existing-038"
+  }
+}

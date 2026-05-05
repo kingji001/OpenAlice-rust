@@ -1,0 +1,7 @@
+{
+  "name": "case-plain-amend-005",
+  "operation": {
+    "action": "cancelOrder",
+    "orderId": "mock-existing-005"
+  }
+}

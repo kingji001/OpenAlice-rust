@@ -1,0 +1,7 @@
+{
+  "name": "case-plain-duplicate-003",
+  "operation": {
+    "action": "cancelOrder",
+    "orderId": "mock-existing-003"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "case-buy-lmt-gtd-plain-018dec-148",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "lmtPrice": "0.123456789012345678",
+      "orderType": "LMT",
+      "tif": "GTD",
+      "totalQuantity": "0.123456789012345678"
+    }
+  }
+}

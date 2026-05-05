@@ -1,0 +1,23 @@
+{
+  "name": "case-sell-lmt-fok-tpsl-zero-487",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "SELL",
+      "lmtPrice": "0",
+      "orderType": "LMT",
+      "tif": "FOK",
+      "totalQuantity": "0"
+    },
+    "tpsl": {
+      "stopLoss": "140.0",
+      "takeProfit": "160.0"
+    }
+  }
+}

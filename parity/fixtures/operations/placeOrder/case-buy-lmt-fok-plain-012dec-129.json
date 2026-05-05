@@ -1,0 +1,19 @@
+{
+  "name": "case-buy-lmt-fok-plain-012dec-129",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "lmtPrice": "0.123456789012",
+      "orderType": "LMT",
+      "tif": "FOK",
+      "totalQuantity": "0.123456789012"
+    }
+  }
+}

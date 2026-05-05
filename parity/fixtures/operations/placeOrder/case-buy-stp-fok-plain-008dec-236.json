@@ -1,0 +1,19 @@
+{
+  "name": "case-buy-stp-fok-plain-008dec-236",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": "0.12345678",
+      "orderType": "STP",
+      "tif": "FOK",
+      "totalQuantity": "0.12345678"
+    }
+  }
+}

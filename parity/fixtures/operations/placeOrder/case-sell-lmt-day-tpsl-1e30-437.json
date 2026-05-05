@@ -1,0 +1,23 @@
+{
+  "name": "case-sell-lmt-day-tpsl-1e30-437",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "SELL",
+      "lmtPrice": "1000000000000000000000000000000",
+      "orderType": "LMT",
+      "tif": "DAY",
+      "totalQuantity": "1000000000000000000000000000000"
+    },
+    "tpsl": {
+      "stopLoss": "140.0",
+      "takeProfit": "160.0"
+    }
+  }
+}

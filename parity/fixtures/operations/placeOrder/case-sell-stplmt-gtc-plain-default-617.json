@@ -1,0 +1,20 @@
+{
+  "name": "case-sell-stplmt-gtc-plain-default-617",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "SELL",
+      "auxPrice": "150.5",
+      "lmtPrice": "150.5",
+      "orderType": "STP LMT",
+      "tif": "GTC",
+      "totalQuantity": "100"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "case-sell-stp-fok-plain-default-569",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "SELL",
+      "auxPrice": "150.5",
+      "orderType": "STP",
+      "tif": "FOK",
+      "totalQuantity": "100"
+    }
+  }
+}

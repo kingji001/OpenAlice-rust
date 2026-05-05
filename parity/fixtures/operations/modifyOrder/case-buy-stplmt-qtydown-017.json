@@ -1,0 +1,10 @@
+{
+  "name": "case-buy-stplmt-qtydown-017",
+  "operation": {
+    "action": "modifyOrder",
+    "changes": {
+      "totalQuantity": "50"
+    },
+    "orderId": "mock-existing-017"
+  }
+}

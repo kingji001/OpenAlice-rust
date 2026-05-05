@@ -1,0 +1,18 @@
+{
+  "name": "case-sell-mkt-day-plain-zero-367",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "SELL",
+      "orderType": "MKT",
+      "tif": "DAY",
+      "totalQuantity": "0"
+    }
+  }
+}

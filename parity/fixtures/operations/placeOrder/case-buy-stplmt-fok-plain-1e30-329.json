@@ -1,0 +1,20 @@
+{
+  "name": "case-buy-stplmt-fok-plain-1e30-329",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": "1000000000000000000000000000000",
+      "lmtPrice": "1000000000000000000000000000000",
+      "orderType": "STP LMT",
+      "tif": "FOK",
+      "totalQuantity": "1000000000000000000000000000000"
+    }
+  }
+}

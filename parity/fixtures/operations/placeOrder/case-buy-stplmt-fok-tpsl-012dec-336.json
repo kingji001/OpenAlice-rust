@@ -1,0 +1,24 @@
+{
+  "name": "case-buy-stplmt-fok-tpsl-012dec-336",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": "0.123456789012",
+      "lmtPrice": "0.123456789012",
+      "orderType": "STP LMT",
+      "tif": "FOK",
+      "totalQuantity": "0.123456789012"
+    },
+    "tpsl": {
+      "stopLoss": "140.0",
+      "takeProfit": "160.0"
+    }
+  }
+}

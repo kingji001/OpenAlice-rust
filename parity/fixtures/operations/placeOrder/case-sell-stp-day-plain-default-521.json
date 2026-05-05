@@ -1,0 +1,19 @@
+{
+  "name": "case-sell-stp-day-plain-default-521",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "SELL",
+      "auxPrice": "150.5",
+      "orderType": "STP",
+      "tif": "DAY",
+      "totalQuantity": "100"
+    }
+  }
+}

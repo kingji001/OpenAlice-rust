@@ -1,0 +1,19 @@
+{
+  "name": "case-buy-stp-gtd-plain-subsat-261",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": "0.000000001",
+      "orderType": "STP",
+      "tif": "GTD",
+      "totalQuantity": "0.000000001"
+    }
+  }
+}

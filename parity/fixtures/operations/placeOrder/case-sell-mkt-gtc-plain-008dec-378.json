@@ -1,0 +1,18 @@
+{
+  "name": "case-sell-mkt-gtc-plain-008dec-378",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "SELL",
+      "orderType": "MKT",
+      "tif": "GTC",
+      "totalQuantity": "0.12345678"
+    }
+  }
+}

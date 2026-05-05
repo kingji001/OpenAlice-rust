@@ -1,0 +1,7 @@
+{
+  "name": "case-plain-risk-limit-002",
+  "operation": {
+    "action": "cancelOrder",
+    "orderId": "mock-existing-002"
+  }
+}

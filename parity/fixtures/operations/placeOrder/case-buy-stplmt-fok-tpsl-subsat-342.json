@@ -1,0 +1,24 @@
+{
+  "name": "case-buy-stplmt-fok-tpsl-subsat-342",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": "0.000000001",
+      "lmtPrice": "0.000000001",
+      "orderType": "STP LMT",
+      "tif": "FOK",
+      "totalQuantity": "0.000000001"
+    },
+    "tpsl": {
+      "stopLoss": "140.0",
+      "takeProfit": "160.0"
+    }
+  }
+}

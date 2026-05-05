@@ -1,0 +1,13 @@
+{
+  "name": "case-withqty-subsat-003",
+  "operation": {
+    "action": "closePosition",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "quantity": "0.000000001"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "case-buy-stp-gtc-plain-default-199",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": "150.5",
+      "orderType": "STP",
+      "tif": "GTC",
+      "totalQuantity": "100"
+    }
+  }
+}

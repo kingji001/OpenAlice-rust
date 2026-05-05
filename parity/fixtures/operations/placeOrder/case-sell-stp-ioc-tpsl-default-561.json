@@ -1,0 +1,23 @@
+{
+  "name": "case-sell-stp-ioc-tpsl-default-561",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "SELL",
+      "auxPrice": "150.5",
+      "orderType": "STP",
+      "tif": "IOC",
+      "totalQuantity": "100"
+    },
+    "tpsl": {
+      "stopLoss": "140.0",
+      "takeProfit": "160.0"
+    }
+  }
+}

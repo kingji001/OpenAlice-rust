@@ -1,0 +1,10 @@
+{
+  "name": "case-sell-mkt-qtydown-022",
+  "operation": {
+    "action": "modifyOrder",
+    "changes": {
+      "totalQuantity": "50"
+    },
+    "orderId": "mock-existing-022"
+  }
+}

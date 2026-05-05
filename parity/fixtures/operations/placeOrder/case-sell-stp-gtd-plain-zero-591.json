@@ -1,0 +1,19 @@
+{
+  "name": "case-sell-stp-gtd-plain-zero-591",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "SELL",
+      "auxPrice": "0",
+      "orderType": "STP",
+      "tif": "GTD",
+      "totalQuantity": "0"
+    }
+  }
+}

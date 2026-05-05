@@ -1,0 +1,18 @@
+{
+  "name": "case-buy-mkt-gtc-plain-negative-025",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "orderType": "MKT",
+      "tif": "GTC",
+      "totalQuantity": "-100"
+    }
+  }
+}

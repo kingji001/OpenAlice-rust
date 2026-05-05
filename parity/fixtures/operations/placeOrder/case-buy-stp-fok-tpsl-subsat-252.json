@@ -1,0 +1,23 @@
+{
+  "name": "case-buy-stp-fok-tpsl-subsat-252",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": "0.000000001",
+      "orderType": "STP",
+      "tif": "FOK",
+      "totalQuantity": "0.000000001"
+    },
+    "tpsl": {
+      "stopLoss": "140.0",
+      "takeProfit": "160.0"
+    }
+  }
+}

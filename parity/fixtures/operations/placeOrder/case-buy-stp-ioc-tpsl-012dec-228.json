@@ -1,0 +1,23 @@
+{
+  "name": "case-buy-stp-ioc-tpsl-012dec-228",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "auxPrice": "0.123456789012",
+      "orderType": "STP",
+      "tif": "IOC",
+      "totalQuantity": "0.123456789012"
+    },
+    "tpsl": {
+      "stopLoss": "140.0",
+      "takeProfit": "160.0"
+    }
+  }
+}

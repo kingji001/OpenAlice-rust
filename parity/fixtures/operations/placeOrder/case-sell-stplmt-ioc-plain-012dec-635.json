@@ -1,0 +1,20 @@
+{
+  "name": "case-sell-stplmt-ioc-plain-012dec-635",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "SELL",
+      "auxPrice": "0.123456789012",
+      "lmtPrice": "0.123456789012",
+      "orderType": "STP LMT",
+      "tif": "IOC",
+      "totalQuantity": "0.123456789012"
+    }
+  }
+}

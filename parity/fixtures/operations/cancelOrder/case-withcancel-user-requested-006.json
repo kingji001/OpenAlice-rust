@@ -1,0 +1,10 @@
+{
+  "name": "case-withcancel-user-requested-006",
+  "operation": {
+    "action": "cancelOrder",
+    "orderCancel": {
+      "manualOrderCancelTime": "20260101 00:00:00"
+    },
+    "orderId": "mock-existing-006"
+  }
+}

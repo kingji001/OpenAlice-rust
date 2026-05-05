@@ -1,0 +1,10 @@
+{
+  "name": "case-withcancel-expired-009",
+  "operation": {
+    "action": "cancelOrder",
+    "orderCancel": {
+      "manualOrderCancelTime": "20260101 00:00:00"
+    },
+    "orderId": "mock-existing-009"
+  }
+}

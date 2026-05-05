@@ -1,0 +1,19 @@
+{
+  "name": "case-sell-lmt-gtd-plain-default-489",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "SELL",
+      "lmtPrice": "150.5",
+      "orderType": "LMT",
+      "tif": "GTD",
+      "totalQuantity": "100"
+    }
+  }
+}

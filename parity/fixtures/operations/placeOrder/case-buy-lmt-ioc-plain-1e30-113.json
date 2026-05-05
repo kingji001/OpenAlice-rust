@@ -1,0 +1,19 @@
+{
+  "name": "case-buy-lmt-ioc-plain-1e30-113",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "lmtPrice": "1000000000000000000000000000000",
+      "orderType": "LMT",
+      "tif": "IOC",
+      "totalQuantity": "1000000000000000000000000000000"
+    }
+  }
+}

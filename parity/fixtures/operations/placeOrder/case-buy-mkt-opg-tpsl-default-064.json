@@ -1,0 +1,22 @@
+{
+  "name": "case-buy-mkt-opg-tpsl-default-064",
+  "operation": {
+    "action": "placeOrder",
+    "contract": {
+      "currency": "USD",
+      "exchange": "SMART",
+      "secType": "STK",
+      "symbol": "AAPL"
+    },
+    "order": {
+      "action": "BUY",
+      "orderType": "MKT",
+      "tif": "OPG",
+      "totalQuantity": "100"
+    },
+    "tpsl": {
+      "stopLoss": "140.0",
+      "takeProfit": "160.0"
+    }
+  }
+}
