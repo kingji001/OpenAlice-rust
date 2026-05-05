@@ -1,0 +1,11 @@
+{
+  "name": "06-sub-satoshi-precision",
+  "description": "placeOrder using a sub-satoshi precision fixture (totalQuantity=0.000000001), commit, push.",
+  "steps": [
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-buy-mkt-day-plain-subsat-009.json" },
+    { "op": "commit", "message": "Sub-satoshi quantity buy" },
+    { "op": "push", "stubResults": [
+      { "action": "placeOrder", "success": true, "orderId": "mock-1", "status": "filled", "filledQty": "0.000000001", "filledPrice": "100" }
+    ]}
+  ]
+}

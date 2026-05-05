@@ -1,0 +1,11 @@
+{
+  "name": "07-sentinel-roundtrip",
+  "description": "MKT order whose lmtPrice is UNSET (sentinel UNSET_DECIMAL). Exercises the UNSET sentinel roundtrip path.",
+  "steps": [
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-buy-mkt-day-plain-default-001.json" },
+    { "op": "commit", "message": "MKT order with UNSET lmtPrice sentinel" },
+    { "op": "push", "stubResults": [
+      { "action": "placeOrder", "success": true, "orderId": "mock-1", "status": "filled", "filledQty": "100", "filledPrice": "100" }
+    ]}
+  ]
+}

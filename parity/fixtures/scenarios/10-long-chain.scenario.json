@@ -1,0 +1,56 @@
+{
+  "name": "10-long-chain",
+  "description": "10 sequential single-op commits: stage → commit → push, repeated 10 times with different fixtures.",
+  "steps": [
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-buy-mkt-day-plain-default-001.json" },
+    { "op": "commit", "message": "Chain step 1: buy MKT default" },
+    { "op": "push", "stubResults": [
+      { "action": "placeOrder", "success": true, "orderId": "mock-1", "status": "filled", "filledQty": "100", "filledPrice": "100" }
+    ]},
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-buy-mkt-day-plain-008dec-002.json" },
+    { "op": "commit", "message": "Chain step 2: buy MKT 8-decimal qty" },
+    { "op": "push", "stubResults": [
+      { "action": "placeOrder", "success": true, "orderId": "mock-2", "status": "filled", "filledQty": "100", "filledPrice": "100" }
+    ]},
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-buy-mkt-day-plain-012dec-003.json" },
+    { "op": "commit", "message": "Chain step 3: buy MKT 12-decimal qty" },
+    { "op": "push", "stubResults": [
+      { "action": "placeOrder", "success": true, "orderId": "mock-3", "status": "filled", "filledQty": "100", "filledPrice": "100" }
+    ]},
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-buy-mkt-day-plain-018dec-004.json" },
+    { "op": "commit", "message": "Chain step 4: buy MKT 18-decimal qty" },
+    { "op": "push", "stubResults": [
+      { "action": "placeOrder", "success": true, "orderId": "mock-4", "status": "filled", "filledQty": "100", "filledPrice": "100" }
+    ]},
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-buy-mkt-day-plain-1e30-005.json" },
+    { "op": "commit", "message": "Chain step 5: buy MKT 1e30 qty" },
+    { "op": "push", "stubResults": [
+      { "action": "placeOrder", "success": true, "orderId": "mock-5", "status": "filled", "filledQty": "1e+30", "filledPrice": "100" }
+    ]},
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-sell-mkt-day-plain-default-361.json" },
+    { "op": "commit", "message": "Chain step 6: sell MKT default" },
+    { "op": "push", "stubResults": [
+      { "action": "placeOrder", "success": true, "orderId": "mock-6", "status": "filled", "filledQty": "100", "filledPrice": "100" }
+    ]},
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-sell-mkt-day-plain-008dec-362.json" },
+    { "op": "commit", "message": "Chain step 7: sell MKT 8-decimal qty" },
+    { "op": "push", "stubResults": [
+      { "action": "placeOrder", "success": true, "orderId": "mock-7", "status": "filled", "filledQty": "100", "filledPrice": "100" }
+    ]},
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-sell-mkt-day-plain-012dec-363.json" },
+    { "op": "commit", "message": "Chain step 8: sell MKT 12-decimal qty" },
+    { "op": "push", "stubResults": [
+      { "action": "placeOrder", "success": true, "orderId": "mock-8", "status": "filled", "filledQty": "100", "filledPrice": "100" }
+    ]},
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-sell-mkt-day-plain-018dec-364.json" },
+    { "op": "commit", "message": "Chain step 9: sell MKT 18-decimal qty" },
+    { "op": "push", "stubResults": [
+      { "action": "placeOrder", "success": true, "orderId": "mock-9", "status": "filled", "filledQty": "100", "filledPrice": "100" }
+    ]},
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-buy-lmt-day-plain-default-073.json" },
+    { "op": "commit", "message": "Chain step 10: buy LMT default" },
+    { "op": "push", "stubResults": [
+      { "action": "placeOrder", "success": true, "orderId": "mock-10", "status": "filled", "filledQty": "100", "filledPrice": "150.5" }
+    ]}
+  ]
+}

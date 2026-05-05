@@ -1,0 +1,14 @@
+{
+  "name": "04-reject-then-recommit",
+  "description": "Stage and commit an order, user-reject it, then stage+commit+push different ops.",
+  "steps": [
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-buy-mkt-day-plain-default-001.json" },
+    { "op": "commit", "message": "Buy order (to be user-rejected)" },
+    { "op": "reject", "reason": "Changed mind — market conditions unfavorable" },
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-buy-lmt-day-plain-default-073.json" },
+    { "op": "commit", "message": "Limit buy at safer price" },
+    { "op": "push", "stubResults": [
+      { "action": "placeOrder", "success": true, "orderId": "mock-1", "status": "filled", "filledQty": "100", "filledPrice": "150.5" }
+    ]}
+  ]
+}

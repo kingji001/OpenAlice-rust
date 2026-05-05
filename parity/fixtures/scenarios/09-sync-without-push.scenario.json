@@ -1,0 +1,11 @@
+{
+  "name": "09-sync-without-push",
+  "description": "stageSyncOrders, commit, then push (syncOrders passed to broker — returns success).",
+  "steps": [
+    { "op": "stageSyncOrders", "fixture": "parity/fixtures/operations/syncOrders/case-001.json" },
+    { "op": "commit", "message": "Sync orders (no prior push)" },
+    { "op": "push", "stubResults": [
+      { "action": "syncOrders", "success": true, "status": "submitted" }
+    ]}
+  ]
+}

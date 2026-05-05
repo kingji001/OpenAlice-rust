@@ -1,0 +1,16 @@
+{
+  "name": "03-sync-after-fill",
+  "description": "placeOrder, push (fill), then syncOrders to reconcile state.",
+  "steps": [
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-buy-mkt-day-plain-default-001.json" },
+    { "op": "commit", "message": "Buy order" },
+    { "op": "push", "stubResults": [
+      { "action": "placeOrder", "success": true, "orderId": "mock-1", "status": "filled", "filledQty": "100", "filledPrice": "100" }
+    ]},
+    { "op": "stageSyncOrders", "fixture": "parity/fixtures/operations/syncOrders/case-001.json" },
+    { "op": "commit", "message": "Sync orders after fill" },
+    { "op": "push", "stubResults": [
+      { "action": "syncOrders", "success": true, "status": "submitted" }
+    ]}
+  ]
+}

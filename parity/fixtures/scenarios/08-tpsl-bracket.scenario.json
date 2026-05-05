@@ -1,0 +1,11 @@
+{
+  "name": "08-tpsl-bracket",
+  "description": "placeOrder using a TP-SL bracket fixture, commit, push.",
+  "steps": [
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-buy-lmt-day-tpsl-default-082.json" },
+    { "op": "commit", "message": "Limit buy with TP-SL bracket" },
+    { "op": "push", "stubResults": [
+      { "action": "placeOrder", "success": true, "orderId": "mock-1", "status": "filled", "filledQty": "100", "filledPrice": "150.5" }
+    ]}
+  ]
+}

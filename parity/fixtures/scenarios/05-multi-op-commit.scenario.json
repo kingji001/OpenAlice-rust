@@ -1,0 +1,19 @@
+{
+  "name": "05-multi-op-commit",
+  "description": "One commit with 5 staged operations of different shapes.",
+  "steps": [
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-buy-mkt-day-plain-default-001.json" },
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-sell-mkt-day-plain-default-361.json" },
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-buy-lmt-day-plain-default-073.json" },
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-sell-lmt-day-plain-default-425.json" },
+    { "op": "stagePlaceOrder", "fixture": "parity/fixtures/operations/placeOrder/case-buy-mkt-day-plain-008dec-002.json" },
+    { "op": "commit", "message": "Multi-op batch: 5 orders in one commit" },
+    { "op": "push", "stubResults": [
+      { "action": "placeOrder", "success": true, "orderId": "mock-1", "status": "filled", "filledQty": "100", "filledPrice": "100" },
+      { "action": "placeOrder", "success": true, "orderId": "mock-2", "status": "filled", "filledQty": "100", "filledPrice": "100" },
+      { "action": "placeOrder", "success": true, "orderId": "mock-3", "status": "filled", "filledQty": "100", "filledPrice": "150.5" },
+      { "action": "placeOrder", "success": true, "orderId": "mock-4", "status": "filled", "filledQty": "100", "filledPrice": "150.5" },
+      { "action": "placeOrder", "success": true, "orderId": "mock-5", "status": "filled", "filledQty": "100", "filledPrice": "100" }
+    ]}
+  ]
+}
