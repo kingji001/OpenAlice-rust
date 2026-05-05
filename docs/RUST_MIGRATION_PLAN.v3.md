@@ -1,5 +1,7 @@
 # OpenAlice — Rust Trading-Core Migration Plan (v3)
 
+> **⚠️ Superseded by [v4](RUST_MIGRATION_PLAN.v4.md).** This document is preserved as a historical baseline. Open decisions, risk register additions, and 22 stress-test corrections live in v4. See v4 §14 (Changelog from v3) for the diff.
+
 **Version:** 3.0
 
 **Target repo:** [kingji001/OpenAlice-rust](https://github.com/kingji001/OpenAlice-rust) @ `master`

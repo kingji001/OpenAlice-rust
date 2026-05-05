@@ -1613,6 +1613,13 @@ Export round-trips all three forms.
 | Disk-full during journal/commit write | Low | High | Propagate as `BrokerError(NETWORK)` (transient); explicit test. |
 | `entryFullHash` inclusion increases v2.5 fixture work | Medium | Low | Phase 2.5 explicitly default-accepted; fixtures live alongside Phase 2 fixtures. |
 | Mixed-version commit log loader bug | Medium | Medium | `parity/check-mixed-log.ts` fuzzes randomly-ordered v1/v2-intent/v2-entry sequences. |
+| `commit.notify` event surface invented but not registered in `AgentEventMap` | Medium | Medium | Phase 4f Deliverable 6 registers schema; CI test asserts every Rust-emitted event has a TypeBox schema entry. |
+| Snapshot trigger pipeline change drops snapshots in the swap window | Medium | Medium | Phase 4d Deliverable 5 cuts over inline-callback → event-subscription atomically; integration test asserts no missed snapshot during the swap. |
+| Runtime UTA add/remove leaks tokio tasks / tsfn handles / file descriptors | Medium | High | Phase 4d Deliverable 6: 100-cycle round-trip integration test (§6.5.1); resource leak check in CI. |
+| Reconnect semantics diverge between TS-CCXT and Rust-IBKR/Alpaca recovery loops | Medium | Medium | §6.5.1 parity test asserts equivalent `account.health` event sequence on identical disconnect scenario. |
+| Rust panic in single UTA actor JS-throws into unrelated tool's await chain | Low | High | §6.12.1 `catch_unwind` boundary; Phase 4f Deliverable 8 panic injection test. |
+| LeverUp broker added to `Broker` trait late, breaks Phase 4b assumptions | Medium | Medium | §4.4 surfaces upfront; Phase 4b Deliverable 8 `BrokerCapabilities` extension point validates against LeverUp's whole-position-close + market-only + EIP-712 quirks. |
+| TODO.md "trading-git staging area lost on restart" ports as a known bug; an operator misreads the migration as fixing it | Low | Medium | §6.13 explicitly lists as-is ports; PR body for Phase 3 + 4c calls them out. |
 
 ---
 
@@ -1658,14 +1665,35 @@ Escalate (do not improvise) when:
 
 ### 8.4 Per-phase context budget
 
-These fit a single agent context window:
-- Phase 0, 1a, 1b, 1c, 2, 2.5, 4a, 4b, 4c, 4f, 5 (each spike), 7.
+| Phase | Single-agent context fits? | Files an agent must load |
+|---|---|---|
+| 0 | Yes | `docs/event-system.md`, `CLAUDE.md`, `TODO.md`, `src/domain/trading/*` (read-only inventory) |
+| 1a | Yes | `packages/ibkr/src/*` (DTO classes + decoder) |
+| 1b | Yes | Phase 1a output + `parity/fixtures/orders-on-wire/`, `parity/decimal-inventory.md` |
+| 1c | Yes | Phase 1b adapters + decimal.js docs subset |
+| 2 | Yes | `TradingGit.ts` (657 L), `git-persistence.ts` (48 L), Phase 1 deliverables |
+| 2.5 | Yes | Phase 2 deliverables + 1 new file |
+| 3 (a) decimal + canonical | Yes | decimal.js + bigdecimal docs, canonical formatter spec, Phase 1c source |
+| 3 (b) PersistedCommit | Yes | Phase 2 PersistedCommit decoder + V1Opaque shape spec |
+| 3 (c) TradingGit state machine | **TIGHT — fresh agent** | `TradingGit.ts` (657 L), `types.ts`, `interfaces.ts`, GitState rehydration logic, parity fixtures |
+| 3 (d) napi typed surface | Yes | napi-rs docs subset, Phase 3(c) Rust source |
+| 4a | Yes | `UnifiedTradingAccount.ts` (586 L), AsyncQueue ref impl |
+| 4b | Yes | `brokers/types.ts`, `MockBroker.ts` (548 L), `brokers/types.ts:45-59` classifyMessage |
+| 4c | Yes | `guards/*` (~10 files), `TradingGit.ts:90-130` (push loop context) |
+| 4d (a) UtaActor core | **TIGHT — fresh agent** | `UnifiedTradingAccount.ts` (586 L) + Phase 3 + Phase 4a + actor pattern docs |
+| 4d (b) health + recovery | Yes | `UnifiedTradingAccount.ts:193-328` (health), Phase 4d(a) source |
+| 4d (c) commit persistence + reconciler | **TIGHT — fresh agent** | `git-persistence.ts`, `snapshot/store.ts`, snapshot reconciler logic |
+| 4e (a) ExecutionJournal + atomic write | Yes | journal protocol spec + Phase 4d output |
+| 4e (b) per-broker client-order-ID | Yes | per-broker client-order-ID specs (IBKR `nextValidId`, Alpaca, etc.) |
+| 4e (c) restart reconciler + crash test | Yes | restart reconciler logic + crash test harness |
+| 4f | **TIGHT — fresh agent** | EVERYTHING above + napi-rs typed export + `telegram-plugin.ts:111-194` + `AgentEventMap` |
+| 5 (each spike) | Yes | broker crate + IBKR/Alpaca proto + journal protocol summary |
+| 6.alpaca / 6.ibkr | Multi-agent | sub-PR (a) port, (b) record/replay, (c) live test — separate agents |
+| 7 | Yes | rollback script + dogfood checklist |
 
-These need internal sub-PR splits:
-- **Phase 3:** (a) decimal types + canonical, (b) `PersistedCommit` + classifier, (c) `TradingGit` state machine, (d) napi typed surface.
-- **Phase 4d:** (a) `UtaActor` core + state machine, (b) health + recovery, (c) commit persistence + reconciler.
-- **Phase 4e:** (a) `ExecutionJournal` + atomic write, (b) per-broker client-order-ID, (c) restart reconciler + crash test.
-- **Phase 6.<broker>:** (a) Rust port behind flag, (b) record/replay harness, (c) nightly live test.
+The "TIGHT — fresh agent" rows mean: a **fresh agent**, not the same agent that did the prior sub-PR. Each phase deliverable PR explicitly states "fresh-agent context required" in the PR body so the orchestrator knows to spawn a new agent.
+
+Phase 0 Deliverable 8 creates the per-sub-PR context worksheet template (`parity/context-worksheets/_template.md`). Sub-PR splits for Phase 3 and Phase 4d follow the rows above; Phase 4e splits per the original v3 sub-PR list (4e (a)/(b)/(c)).
 
 ---
 
@@ -1716,12 +1744,16 @@ Phase 5's job is to choose between these. Both are acceptable.
 
 ## 11. Open decisions (lock at execution time)
 
-These are explicit calls the maintainer (or executing agent) must record in the PR or `docs/migration-broker-decision.md`:
+These are explicit calls the maintainer (or executing agent) must record in the PR or `docs/migration-broker-decision.md`. **v4 decisions** (1–4) are pre-locked in [docs/superpowers/decisions/2026-05-05-v4-open-decisions.md](superpowers/decisions/2026-05-05-v4-open-decisions.md):
 
 - [ ] **Phase 2.5 entry hash:** default-accepted. Decline only if there's a specific reason; record the reason.
 - [ ] **Phase 5 verdict per broker:** Rust port endorsed / not endorsed. Independent decisions for Alpaca and IBKR.
 - [ ] **Phase 4e journal retention policy:** how long to keep `executing/done/<commit-hash>.json`. Default: 30 days. Configurable.
 - [ ] **Phase 6 default broker impl:** the per-broker default in `tradingCore.defaultBrokerImpl` flips from `'ts'` to `'rust'` at Phase 6.<broker>.b. Confirm green-night threshold (default 3 consecutive nights of live tests).
+- [x] **§4.4 LeverUp scope.** Stay TS until LeverUp's TS impl stabilizes. Revisit post-Phase-7. (See [decision 1](superpowers/decisions/2026-05-05-v4-open-decisions.md#decision-1).)
+- [x] **§6.13 TODO.md as-is items.** Trading-git staging area + cooldown guard state: port-as-is. (See [decision 2](superpowers/decisions/2026-05-05-v4-open-decisions.md#decision-2).)
+- [x] **§6.14 interleaving stance.** Accept current `getPortfolio` inconsistency. No `getPortfolioSnapshot` in Phase 4f. (See [decision 3](superpowers/decisions/2026-05-05-v4-open-decisions.md#decision-3).)
+- [x] **§6.12.1 panic dedup threshold.** N=5 default for `tradingCore.panicDisableThreshold`. (See [decision 4](superpowers/decisions/2026-05-05-v4-open-decisions.md#decision-4).)
 
 ---
 
@@ -1731,25 +1763,31 @@ Following the v2 review's recommendation:
 
 ```
 Approve now (mechanical, low-risk):
-  Phase 0   — fixtures & inventory (with toCanonicalDecimalString)
-  Phase 1a  — ibkr-types / ibkr-client split, re-export shim
-  Phase 1b  — wire types (WireDecimal/WireDouble/WireInteger) + adapters
-  Phase 1c  — canonical JSON utility (dead code)
-  Phase 2   — hash v2 intent only (intentFullHash naming)
-  Phase 2.5 — entry hash, default-accepted
-  Phase 3   — Rust TradingGit, dead code, parity-gated only
+  Phase 0   — fixtures & inventory + /api/status route + context worksheets [v4 amend]
+  Phase 1a  — ibkr-types / ibkr-client split + order-decoder.ts move [v4 amend]
+  Phase 1b  — wire types + adapters + UNSET_LONG fixture [v4 amend]
+  Phase 1c  — canonical JSON utility [unchanged]
+  Phase 2   — hash v2 intent only — fix all FOUR timestamp sites (commit/push/reject/sync) [v4 amend]
+  Phase 2.5 — entry hash, default-accepted [unchanged]
+  Phase 3   — Rust TradingGit (sub-PRs a/b/c/d), each fresh-agent context where marked [v4 amend]
 
 Require evidence before approval:
-  Phase 4a  — TS UTA actor retrofit
-  Phase 4b  — Rust Broker trait + Mock + BrokerError SCREAMING_SNAKE unit test
-  Phase 4c  — Rust guards
-  Phase 4d  — Rust UTA actor + persistence + missing-snapshot reconciler
-  Phase 4e  — Execution journal + crash-recovery test
-  Phase 4f  — RustUtaProxy + bounded event-stream contract
-  Phase 5   — broker decision point
-  Phase 6   — broker-by-broker, only after spike report endorsement
-  Phase 7   — TS fallback retained, real dogfood + rollback test
-  Phase 8   — deferred ≥1 minor release after Phase 7
+  Phase 4a  — TS UTA actor retrofit [unchanged]
+  Phase 4b  — Rust Broker trait + Mock + classifyMessage + offline-error rationalization + BrokerCapabilities [v4 amend]
+  Phase 4c  — Rust guards + per-op pre-fetch parity test [v4 amend]
+  Phase 4d  — Rust UTA actor + persistence + snapshot trigger swap + runtime lifecycle + reconnect parity [v4 amend]
+  Phase 4e  — Execution journal + crash-recovery test [unchanged]
+  Phase 4f  — RustUtaProxy + bounded event-stream + commit.notify schema + Telegram smoke test + panic test [v4 amend]
+  Phase 5   — broker decision point — LeverUp explicitly NOT in scope (decision 1) [v4 amend]
+  Phase 6   — broker-by-broker, only after spike report endorsement [unchanged]
+  Phase 7   — TS fallback retained, real dogfood + rollback test [unchanged]
+  Phase 8   — deferred ≥1 minor release after Phase 7 [unchanged]
+
+New gates introduced by v4 (apply across phases):
+  - Reconnect-ownership parity test (§6.5.1) — required for Phase 4d sign-off
+  - Rust panic policy test (§6.12.1) — required for Phase 4f sign-off
+  - Snapshot durability gap log (§6.4.1) — TODO.md entries created by end of Phase 0
+  - Connector consumer matrix (§6.16) — current state documented in Phase 0; updated on every connector change
 ```
 
 ---
@@ -1775,3 +1813,34 @@ This section records every concrete edit applied from the v2 review. Fourteen is
 | 13 | Phase 1 was a single phase. | Split into 1a (package split) / 1b (wire adapters) / 1c (canonical JSON + decimal formatter). | v3 §5 Phase 1. |
 | 14 | Timelines optimistic; "Rust core only" buried. | Padded estimates; "Rust core only" elevated to first-class terminal state in §1 and §5 Phase 5. | v3 §1, §9. |
 | Decision | (this turn) | Phase 2.5 default-accepted, between Phase 2 and Phase 3. Broker-execution journal as Phase 4e (not folded into 4d). | v3 Phase 2.5, Phase 4e. |
+
+---
+
+## 14. Changelog from v3
+
+This section mirrors §13's format. Each row records one diff applied from a stress-test review of v3 (commit `c60de33` of the v4 outline).
+
+| # | v3 claim | v4 correction | Verified against |
+|---|----------|---------------|------------------|
+| 1 | Phase 4c: `GuardPipeline.wrap` "pre-fetches `[positions, account]` outside the loop." | Function is `createGuardPipeline` (no class). Pre-fetch is **per op**, not per push. Rust matches per-op. | `guards/guard-pipeline.ts:13-37`, `TradingGit.ts:100-112` |
+| 2 | Phase 2: timestamp desync at `commit()` and `push()`. | Same bug at `reject()` and `sync()`. Fix all four sites. | `TradingGit.ts:69, 124, 172, 386, 404` |
+| 3 | §3.4 release gate: `curl -sf http://localhost:3002/api/status`. | `/api/status` did not exist in v3-tree. v4 ships it as Phase 0 Deliverable 9. | `web-plugin.ts:93-114` |
+| 4 | `commit.notify` referenced in v3 §6.4 / §1 / §7 / §8 / §11 as if it exists. | Net-new event. v4 Phase 4f Deliverable 6 registers schema in `AgentEventMap` with TypeBox. | `agent-event.ts:91-103, 275`; grep returns zero |
+| 5 | §6.10: `ccxt: 'ts'` "literal-pinned at the Zod schema level." | `tradingCore` namespace is net-new. v4 Phase 4f introduces it. | `src/core/config.ts` (no references) |
+| 6 | Phase 1a: "purely mechanical refactor." | Decoder constructs DTO classes via `new` and mutates fields. `order-decoder.ts` lives at wrong layer. | `decoder/{execution,account,contract}.ts`; `order-decoder.ts` |
+| 7 | §6.4 / Phase 4d: snapshot trigger described as event-based. | Inline callback today (`UnifiedTradingAccount.ts:429`). Actor→TS hop is net-new structural change. | `main.ts:115-119`, `UnifiedTradingAccount.ts:429` |
+| 8 | §4.3 / Phase 3: `TradingGit` "ports cleanly." | `TradingGitConfig` carries 3 callbacks tunneling broker surface across FFI. `Order` rehydration is broker-shape-aware. | `interfaces.ts:55-59`, `TradingGit.ts:312-371` |
+| 9 | §6.2: v1 hashes are "opaque." | Make explicit: change-detection tokens, not content addresses. Depend on JS class iteration order + decimal.js. | `TradingGit.ts:33-38, 70-75` |
+| 10 | Phase 4b: `BrokerError` shape `{code, message, permanent}`. | `class extends Error` with non-trivial `classifyMessage()` regex pipeline. `push()` offline-rejection throws plain `Error`, not `BrokerError`. | `brokers/types.ts:16, 45-59`; `UnifiedTradingAccount.ts:421-431` |
+| 11 | §4.2: UTAManager wires {EventLog, ToolCenter, FxService, snapshot hooks, CCXT tools}. | Surface is broader: `getAggregatedEquity`, `searchContracts`/`getContractDetails`, `createGitPersister`, `broker.factory`/`getBrokerPreset`. | `uta-manager.ts:71-330` |
+| 12 | §4 / §5: brokers covered are CCXT, Alpaca, IBKR, Mock. | LeverUp absent. v4 §4.4 adds placement; decision: stay TS. Phase 4b Deliverable 8 adds `BrokerCapabilities` for forward-compat. | `TODO.md:232-257` |
+| 13 | (Not addressed.) Runtime UTA add/remove via HTTP. | `UTAManager.{initUTA,reconnectUTA,removeUTA,add,remove}` driven from HTTP. v4 Phase 4d Deliverable 6 ships actor lifecycle handlers + 100-cycle test. | `uta-manager.ts:93,111,154,172,179`; HTTP routes |
+| 14 | (Not addressed.) Reconnect ownership across the FFI. | New §6.5.1 matrix. TS owns CCXT recovery, Rust owns IBKR/Alpaca recovery post-port. Parity test in Phase 4d. | `UnifiedTradingAccount.ts:296-328`; `uta-manager.ts:111-151` |
+| 15 | (Not addressed.) Rust panic policy. | New §6.12.1 + P13. `catch_unwind` boundary; panics → typed JS errors; no process abort. Phase 4f Deliverable 8 panic injection test. Default panic dedup `N=5` (decision 4). | `napi-rs` docs |
+| 16 | (Not addressed.) Snapshot durability asymmetry. | New §6.4.1 enumerates 3 gaps the reconciler doesn't close. Out of scope; logged with `[snapshot-durability]` tag. | `snapshot/store.ts:51-56, 83-84, 109-111` |
+| 17 | (Not addressed.) Tool-surface contract. | New §6.14 enumerates 16 tools + UTA touchpoints. `getPortfolio` interleaving hazard documented. Latency budget set. | `src/tool/trading.ts:121-512` |
+| 18 | (Not addressed.) Cross-UTA atomicity. | New §6.15 documents best-effort sequential as intentional carry-over. | `src/tool/trading.ts:457-465` |
+| 19 | (Not addressed.) Connector consumer matrix. | New P14 + §6.16. Telegram observes/mutates trading state directly. Phase 4f Deliverable 7 Telegram smoke test. | `telegram-plugin.ts:111-194` |
+| 20 | (Not addressed.) Pre-existing TODO.md items overlap migration. | New §6.13 triages: staging-area + cooldown port-as-is; snapshot/FX out-of-scope; LeverUp into §4.4. | `TODO.md:60-69, 71-78, 80-86, 88-93, 95-102, 232-257` |
+| 21 | §8.4: Phases 0–2.5, 4a/4b/4c/4f, 5(spike), 7 "fit a single agent context window." | Optimistic for 3(c), 4d(a), 4d(c), 4f. v4 §8.4 replaces with tiered table marking which sub-PRs need fresh-agent context. | `TradingGit.ts` (657L) + `UnifiedTradingAccount.ts` (586L) |
+| 22 | (Not addressed.) `UNSET_LONG = BigInt(2 ** 63) - 1n` JS precision bug. | v4 §6.1 caveats + Phase 1b Deliverable 5 fixture for canonical `i64::MAX` reconstruction. | `packages/ibkr/src/const.ts:12` |
