@@ -1178,6 +1178,8 @@ Unchanged from v2 in spirit; tightened to reflect §6.11 and the journal protoco
    - State 1: both endorsed → port both in Phase 6.
    - State 2: neither endorsed → migration ends at Phase 7. Rust core ships; brokers stay TS forever. **This is an acceptable, first-class outcome.**
 
+   **LeverUp not in scope** for Phase 5 spike (per [v4 open decisions](../docs/superpowers/decisions/2026-05-05-v4-open-decisions.md#decision-1) — stay TS until LeverUp's TS impl stabilizes). The decision document records this; revisit post-Phase-7.
+
 **DoD:**
 
 ```bash
@@ -1259,9 +1261,11 @@ After Rust default for one minor release with no production rollbacks:
 
 Both implementations share fixtures: `parity/fixtures/canonical-decimal/`. Adversarial cases: `1e30`, `1e-30`, `-0`, `0.1 + 0.2`, sub-satoshi (8/12/18 decimals), negative, `NaN` (must throw), `Infinity` (must throw).
 
+**`UNSET_LONG` JS precision caveat.** [packages/ibkr/src/const.ts:12](../packages/ibkr/src/const.ts:12) defines `UNSET_LONG = BigInt(2 ** 63) - 1n`. The `2 ** 63` is computed as a JS Number, exceeds `Number.MAX_SAFE_INTEGER`, and rounds. The `BigInt(...)` then wraps the rounded value, so `UNSET_LONG` is **not** exactly `i64::MAX`. If any IBKR field maps to Rust `i64` in the wire-type design, the Rust side reconstructs `i64::MAX` from the canonical wire form, not from the lossy TS source. Phase 1b adds a fixture asserting exact `i64::MAX` round-trip.
+
 ### 6.2 Hash stability — forward-only, two layers
 
-- **v1 commits** (everything currently on disk): `hash` is opaque. Never recomputed.
+- **v1 commits** (everything currently on disk): `hash` is opaque. Never recomputed. **v1 hash provenance:** verified at [TradingGit.ts:33-38, :70-75](../src/domain/trading/git/TradingGit.ts:33), the v1 commit hash is `sha256(JSON.stringify({ message, operations, timestamp, parentHash })).slice(0, 8)`. The `JSON.stringify` output depends on JS class iteration order (e.g., `Order`, `Contract`) and decimal.js `.toString()` choices. There is no key-sort, no normalization, no stable encoding. **v1 hashes are change-detection tokens, not content addresses.** A Rust impl cannot reproduce them and will not try. Loaders preserve v1 verbatim (`PersistedCommit::V1Opaque`); display them; never re-hash.
 - **v2 commits** (post-Phase-2): `hashVersion: 2`, `intentFullHash` (64-char SHA-256 over canonical intent input), `hashInputTimestamp` (the exact timestamp fed into the hash). Verifies user/agent intent.
 - **Phase 2.5 entry hash** (if endorsed): `entryHashVersion: 1`, `entryFullHash` (64-char SHA-256 over the full persisted commit, excluding `entryFullHash` itself). Verifies execution outcome and persisted state.
 
@@ -1313,6 +1317,8 @@ async fn persist_atomically(path: &Path, contents: &[u8]) -> Result<()> {
 }
 ```
 
+**Asymmetry note.** The atomic-write recipe applies to Rust-owned `commit.json` only. The TS-side snapshot writer ([src/domain/trading/snapshot/store.ts](../src/domain/trading/snapshot/store.ts)) is **not** upgraded as part of this migration. Snapshot writes use `appendFile` for chunks (non-atomic) and lack `fsync` on file or parent dir. The missing-snapshot reconciler closes one gap; §6.4.1 enumerates the gaps it leaves. The asymmetry is acknowledged, not unintentional — fixing it is out of scope, tracked separately.
+
 **Missing-snapshot reconciler** (closes the gap noted by v2 review — there is no reconciler in the current code, so v3 ships one as a Phase 4d deliverable):
 
 ```rust
@@ -1333,6 +1339,22 @@ async fn reconcile_missing_snapshots(account_id: &str) -> Result<Vec<String>> {
 
 After commit persistence succeeds, the actor emits `commit.notify` to TS for snapshot/UI consumption. **TS never gates push success on its own write.**
 
+### 6.4.1 Snapshot durability gaps
+
+Three gaps the missing-snapshot reconciler does **not** close, all in `src/domain/trading/snapshot/store.ts`:
+
+1. **Non-atomic chunk append** ([store.ts:83](../src/domain/trading/snapshot/store.ts:83)). Raw `appendFile` for snapshot chunks. A crash mid-write produces a chunk file with a partial last line. The reconciler scans index entries and counts on `chunk.count` — corrupted last lines are invisible until `readRange` parses and throws.
+2. **No `fsync`** ([store.ts:51-56](../src/domain/trading/snapshot/store.ts:51)). Snapshot writes do `rename(tmp, indexPath)` without fsync of the file or parent dir.
+3. **Index/chunk write inconsistency** ([store.ts:83-84](../src/domain/trading/snapshot/store.ts:83)). `doAppend` writes the chunk first then updates the index. A crash between them: chunk has the snapshot, index doesn't. Reconciler thinks the snapshot is missing and triggers a **second** snapshot for the same commit hash — duplicate entries.
+
+**Mitigations not adopted in this migration** (logged in `TODO.md` with `[snapshot-durability]` during Phase 0):
+
+- Chunk append over fsync'd write+rename pairs
+- Transactional `index+chunk` write via two-phase rename
+- Reconciler duplicate-detection step
+
+The migration ships the missing-snapshot reconciler (Phase 4d) and accepts the three gaps above.
+
 ### 6.5 Per-UTA serialization (P7)
 
 Both Rust UTAs (Phase 4d) and TS UTAs (Phase 4a retrofit) implement the actor pattern:
@@ -1342,6 +1364,30 @@ Both Rust UTAs (Phase 4d) and TS UTAs (Phase 4a retrofit) implement the actor pa
 - The actor task is the single mutator of `TradingGit`, broker connection state, journal, and health counters.
 
 This fixes a **latent race in the current TS implementation** — there's no lock today against parallel AI tool calls interleaving `stage / commit / push` on the same UTA. Phase 4a ships the fix to TS regardless of Rust progress.
+
+### 6.5.1 Reconnect ownership matrix
+
+Today, reconnect lives in two places:
+
+- **UTA-level auto-recovery** ([UnifiedTradingAccount.ts:296-328](../src/domain/trading/UnifiedTradingAccount.ts:296)). Exponential backoff 5s → 60s, broker-agnostic. Calls `broker.init()` + `broker.getAccount()` to test.
+- **`UTAManager.reconnectUTA`** ([uta-manager.ts:111-151](../src/domain/trading/uta-manager.ts:111)). Reads fresh config and **recreates** the UTA — full re-instantiation, not just reconnection. Re-registers CCXT provider tools.
+
+Brokers (`CcxtBroker`, `AlpacaBroker`, `IbkrBroker`) have no reconnect logic of their own — they expose only `init()` / `close()`.
+
+**After migration:**
+
+| Broker | Recovery loop owner | Triggered by | Health emitter |
+|---|---|---|---|
+| CCXT | TS UTA actor (Phase 4a retrofit) | `_scheduleRecoveryAttempt` | TS `eventLog.append('account.health', …)` |
+| IBKR (Rust path, post-Phase 6.ibkr) | Rust UTA actor (Phase 4d) | Same algorithm, ported | Rust mpsc → TS `EventLog` via `commit.notify`-channel |
+| IBKR (TS fallback path) | TS UTA actor (Phase 4a retrofit) | Same | TS |
+| Alpaca (Rust path, post-Phase 6.alpaca) | Rust UTA actor | Same | Rust mpsc |
+| Alpaca (TS fallback path) | TS UTA actor | Same | TS |
+| Mock | Same as broker family running it | | |
+
+**Risk:** divergence between TS and Rust recovery-loop semantics (back-off intervals, jitter, `_disabled` semantics for permanent errors). **Mitigation:** Phase 4d parity test asserts TS-CCXT and Rust-Mock produce equivalent `account.health` event sequences for an identical disconnect scenario. Phase 4f extends to real-broker Mock paths.
+
+**Actor lifecycle on reconnect.** `UTAManager.reconnectUTA` recreates the UTA. For Rust-backed UTAs: drain the old actor's mpsc → join the tokio task → unregister tsfn → spawn new actor → register new tsfn. **Phase 4d** integration test covers the lifecycle (spawn/teardown 100 cycles); **Phase 4f** integration test covers reconnect via the proxy (tsfn re-registration + EventLog re-subscription).
 
 ### 6.6 Typed FFI surface (P10)
 
@@ -1377,6 +1423,8 @@ Nightly / manual:
 Rust uses `tracing` with `tracing-subscriber` writing JSON lines to a napi `ThreadsafeFunction` callback (subject to §6.12 lifecycle rules). TS receives each line and forwards to `pino`. Trace IDs propagate from AgentCenter through FFI to broker calls.
 
 ### 6.10 Feature-flag config (structured)
+
+**`tradingCore` is a new config namespace.** v3 implies (line 1343) `ccxt: 'ts'` is "literal-pinned at the Zod schema level," which reads as if an existing flag is being constrained. Verified at [src/core/config.ts](../src/core/config.ts): there is **no** existing `tradingCore` namespace; zero references to `defaultBrokerImpl`. The Phase 4f deliverable introduces this namespace; Zod literal-pinning is on the **new** schema. Account-level `brokerImpl` override is also new; `accounts.json` schema needs the field added in Phase 4f. The `panicDisableThreshold` setting (§6.12.1) lives in this namespace too.
 
 `data/config/trading-core.json`:
 ```json
@@ -1444,7 +1492,77 @@ Rust→TS event delivery rules:
 - **EventLog append failure:** retried with exponential backoff (3 attempts) within TS; on final failure, the event is logged and a `eventlog.append_failed` metric increments.
 - **Gap detection:** TS observes `seq` per UTA. On gap, calls `trading_core.event_log_recent(uta_id, after_seq)` to backfill.
 
-### 6.13 Mixed-version commit log loader
+### 6.12.1 Rust panic policy (P13 enforcement)
+
+- **Boundary.** Every `#[napi]`-exported method body is wrapped in `std::panic::catch_unwind`. The wrapper converts panic payloads to typed `napi::Error` with `code = "RUST_PANIC"` and `message = <panic message + backtrace>`.
+- **`ThreadsafeFunction` callbacks.** `tsfn.call` itself does not unwind into the Node thread. Panics inside the Rust task that **produces** events go through the same `catch_unwind` wrapper; on panic, the actor emits a synthetic `account.health` event with `state: 'offline'`, `reason: 'rust_panic'`, then exits cleanly.
+- **TS handling.** `RustUtaProxy` catches `code === 'RUST_PANIC'` errors and (a) logs a structured event, (b) marks the UTA offline via the same path as `BrokerError(NETWORK)`, (c) schedules a recovery attempt that respawns the actor. **No process abort.**
+- **Test.** Phase 4f DoD adds `parity/check-rust-panic.ts` — inject a panic into the Mock broker, verify TS-side error shape, recovery, and that other UTAs are unaffected.
+- **Panic dedup.** After N consecutive `RUST_PANIC` errors on the same UTA, mark it `disabled` and require manual `reconnectUTA`. Default `N = 5`; configurable via `tradingCore.panicDisableThreshold`. Locked in [v4 open decisions](../docs/superpowers/decisions/2026-05-05-v4-open-decisions.md#decision-4).
+
+### 6.13 Pre-existing TODO.md triage
+
+Each `TODO.md` item below overlaps with the Rust migration. Per-item fate:
+
+| TODO entry (line) | Migration touches | Decision |
+|---|---|---|
+| Trading git staging area lost on restart (88-93) | Phase 3, Phase 4d | **Port-as-is.** Preserves parity. Fix in a separate post-migration PR. Document in Phase 3 PR body with `[migration-deferred]` tag. (Decision locked in [v4 open decisions](../docs/superpowers/decisions/2026-05-05-v4-open-decisions.md#decision-2).) |
+| Cooldown guard state lost on restart (80-86) | Phase 4c | **Port-as-is.** Same rationale. `[migration-deferred]` tag. |
+| Snapshot/FX numbers wildly wrong (60-69) | Snapshot stays TS | **Out of scope.** Migration does not fix; TODO entry stays open. |
+| OKX UTA spot-holding fix needs live confirmation (95-102) | CCXT stays TS | **Out of scope.** Note in Phase 5 spike: CCXT is not exercised by parity work. |
+| Heartbeat dedup window lost on restart (71-78) | Out of trading scope | **Out of scope.** Listed for completeness. |
+| LeverUp items (232-257) | Phase 4b Broker trait, §4.4 | **Stay TS** (decision 1). Phase 4b adds `BrokerCapabilities` extension point so a future Rust port doesn't require trait-shape rework. |
+
+**Principle:** the migration preserves existing behavior including known bugs; fixes ride in separate PRs after Phase 7. P4 ("one concept per phase") would be violated by fix-during-port.
+
+### 6.14 Tool-surface contract
+
+`src/tool/trading.ts` exposes 16 tools that call UTA methods directly via `manager.resolve()` / `manager.resolveOne()` — no abstraction layer. v4 enumerates the contract `RustUtaProxy` must honor:
+
+| Tool | UTA method(s) | Sync requirement | Notes |
+|---|---|---|---|
+| `searchContracts` ([:121-130](../src/tool/trading.ts:121)) | `uta.searchContracts` | async OK | UTAManager-level today |
+| `getAccount` ([:165-173](../src/tool/trading.ts:165)) | `uta.getAccount` | async OK | |
+| `getPortfolio` ([:184-235](../src/tool/trading.ts:184)) | `uta.getPositions` + `uta.getAccount` (back-to-back) | **interleaving hazard** | P7 protects within one mpsc round-trip, not between two |
+| `getOrders` ([:249-271](../src/tool/trading.ts:249)) | `uta.getOrders` (`Promise.all` across UTAs) | latency-sensitive | FFI overhead × N accounts |
+| `getQuote` ([:282-291](../src/tool/trading.ts:282)) | `uta.getQuote` | async OK | |
+| `tradingLog` ([:319-327](../src/tool/trading.ts:319)) | `uta.gitLog` | async OK | |
+| `tradingShow` ([:333-339](../src/tool/trading.ts:333)) | `uta.show(hash)` on every UTA | sync-style scan | Async-message proxy can satisfy if `show` is keyed by hash and returns immediately |
+| `tradingStatus` ([:346-349](../src/tool/trading.ts:346)) | `uta.status` | async OK | Telegram also calls this |
+| `simulatePriceChange` ([:362-367](../src/tool/trading.ts:362)) | `uta.simulatePriceChange` | async OK | |
+| `tradingStagePlaceOrder` ([:410](../src/tool/trading.ts:410)) | `uta.stagePlaceOrder` | async OK | |
+| `tradingStageCancelOrder` ([:427](../src/tool/trading.ts:427)) | `uta.stageCancelOrder` | async OK | |
+| `tradingStageReplaceOrder` ([:438](../src/tool/trading.ts:438)) | `uta.stageReplaceOrder` | async OK | |
+| `tradingStageClosePosition` ([:447](../src/tool/trading.ts:447)) | `uta.stageClosePosition` | async OK | |
+| `tradingCommit` ([:457-465](../src/tool/trading.ts:457)) | `uta.commit` per UTA, no source = all UTAs | best-effort sequential | See §6.15 |
+| `tradingPush` ([:473-493](../src/tool/trading.ts:473)) | `uta.push` per UTA | latency-sensitive | Telegram also calls this |
+| `tradingSync` ([:503-512](../src/tool/trading.ts:503)) | `uta.sync` | async OK | |
+
+**Latency budget.** `RustUtaProxy` round-trip target: ≤5 ms per call on Mock. Phase 4f parity test asserts `Promise.all([5 UTAs].map(u => u.getOrders()))` completes in ≤50 ms.
+
+**Interleaving hazard.** `getPortfolio` does back-to-back `uta.getPositions()` + `uta.getAccount()` ([:190-191](../src/tool/trading.ts:190)) expecting consistent state. Under the actor model, a `commit` from another tool call can interleave between the two `await`s. **v4 accepts current inconsistency** for parity (locked in [v4 open decisions](../docs/superpowers/decisions/2026-05-05-v4-open-decisions.md#decision-3)). A `getPortfolioSnapshot` actor command for atomic reads is reserved for post-migration improvement.
+
+### 6.15 Cross-UTA semantics
+
+Operations spanning multiple UTAs (`tradingCommit` with no source, `getPortfolio`, `getOrders`, `simulatePriceChange`) are **best-effort sequential, not transactional**. If UTA A commits successfully and UTA B fails, the result is a partial-commit state with no rollback.
+
+This is current TS behavior; the migration preserves it. The actor model does **not** change this contract — per-UTA serialization is the only atomicity guarantee. Any future cross-UTA atomicity feature would need a new coordinator above the actors (out of scope).
+
+Documented explicitly so post-migration debugging doesn't blame the actor model.
+
+### 6.16 Connector consumer matrix (P14 enforcement)
+
+| Consumer | Source | UTA touchpoints | Latency budget | Migration test |
+|---|---|---|---|---|
+| Web UI (REST) | [src/connectors/web/routes/trading.ts](../src/connectors/web/routes/trading.ts) | direct UTA method calls | UI: ≤200 ms p95 | Phase 4f Mock e2e |
+| Web UI (SSE / EventLog) | [src/connectors/web/routes/events.ts:124](../src/connectors/web/routes/events.ts:124) | EventLog subscribe | streaming | Phase 4f event-stream parity |
+| Telegram (REST-style) | [src/connectors/telegram/telegram-plugin.ts:111-194](../src/connectors/telegram/telegram-plugin.ts:111) | `uta.push` ([:163](../src/connectors/telegram/telegram-plugin.ts:163)), `uta.reject` ([:166](../src/connectors/telegram/telegram-plugin.ts:166)), `uta.status` | ≤10 s (Telegram callback timeout) | **Phase 4f smoke test** |
+| MCP-ask | [src/connectors/mcp-ask/mcp-ask-connector.ts:15](../src/connectors/mcp-ask/mcp-ask-connector.ts:15) | none (`capabilities.push: false`) | n/a | n/a |
+| Diary | [src/connectors/web/routes/diary.ts:137](../src/connectors/web/routes/diary.ts:137) | EventLog read of `account.health` | n/a | event schema parity |
+
+**Rule:** any future consumer added to this list specifies (1) which UTA methods it calls, (2) latency budget, (3) behavior under FFI backpressure (queue full, panic, timeout). The matrix is the load-bearing artifact for §6.12 / P14.
+
+### 6.17 Mixed-version commit log loader
 
 Both TS and Rust must load logs containing v1 + v2-intent-only + v2-with-entry-hash commits in any order. The decoder model:
 
