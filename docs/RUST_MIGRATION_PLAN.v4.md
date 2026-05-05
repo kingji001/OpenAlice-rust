@@ -1178,7 +1178,7 @@ Unchanged from v2 in spirit; tightened to reflect §6.11 and the journal protoco
    - State 1: both endorsed → port both in Phase 6.
    - State 2: neither endorsed → migration ends at Phase 7. Rust core ships; brokers stay TS forever. **This is an acceptable, first-class outcome.**
 
-   **LeverUp not in scope** for Phase 5 spike (per [v4 open decisions](../docs/superpowers/decisions/2026-05-05-v4-open-decisions.md#decision-1) — stay TS until LeverUp's TS impl stabilizes). The decision document records this; revisit post-Phase-7.
+   **LeverUp not in scope** for Phase 5 spike (per [v4 open decisions](superpowers/decisions/2026-05-05-v4-open-decisions.md#decision-1) — stay TS until LeverUp's TS impl stabilizes). The decision document records this; revisit post-Phase-7.
 
 **DoD:**
 
@@ -1498,7 +1498,7 @@ Rust→TS event delivery rules:
 - **`ThreadsafeFunction` callbacks.** `tsfn.call` itself does not unwind into the Node thread. Panics inside the Rust task that **produces** events go through the same `catch_unwind` wrapper; on panic, the actor emits a synthetic `account.health` event with `state: 'offline'`, `reason: 'rust_panic'`, then exits cleanly.
 - **TS handling.** `RustUtaProxy` catches `code === 'RUST_PANIC'` errors and (a) logs a structured event, (b) marks the UTA offline via the same path as `BrokerError(NETWORK)`, (c) schedules a recovery attempt that respawns the actor. **No process abort.**
 - **Test.** Phase 4f DoD adds `parity/check-rust-panic.ts` — inject a panic into the Mock broker, verify TS-side error shape, recovery, and that other UTAs are unaffected.
-- **Panic dedup.** After N consecutive `RUST_PANIC` errors on the same UTA, mark it `disabled` and require manual `reconnectUTA`. Default `N = 5`; configurable via `tradingCore.panicDisableThreshold`. Locked in [v4 open decisions](../docs/superpowers/decisions/2026-05-05-v4-open-decisions.md#decision-4).
+- **Panic dedup.** After N consecutive `RUST_PANIC` errors on the same UTA, mark it `disabled` and require manual `reconnectUTA`. Default `N = 5`; configurable via `tradingCore.panicDisableThreshold`. Locked in [v4 open decisions](superpowers/decisions/2026-05-05-v4-open-decisions.md#decision-4).
 
 ### 6.13 Pre-existing TODO.md triage
 
@@ -1506,7 +1506,7 @@ Each `TODO.md` item below overlaps with the Rust migration. Per-item fate:
 
 | TODO entry (line) | Migration touches | Decision |
 |---|---|---|
-| Trading git staging area lost on restart (88-93) | Phase 3, Phase 4d | **Port-as-is.** Preserves parity. Fix in a separate post-migration PR. Document in Phase 3 PR body with `[migration-deferred]` tag. (Decision locked in [v4 open decisions](../docs/superpowers/decisions/2026-05-05-v4-open-decisions.md#decision-2).) |
+| Trading git staging area lost on restart (88-93) | Phase 3, Phase 4d | **Port-as-is.** Preserves parity. Fix in a separate post-migration PR. Document in Phase 3 PR body with `[migration-deferred]` tag. (Decision locked in [v4 open decisions](superpowers/decisions/2026-05-05-v4-open-decisions.md#decision-2).) |
 | Cooldown guard state lost on restart (80-86) | Phase 4c | **Port-as-is.** Same rationale. `[migration-deferred]` tag. |
 | Snapshot/FX numbers wildly wrong (60-69) | Snapshot stays TS | **Out of scope.** Migration does not fix; TODO entry stays open. |
 | OKX UTA spot-holding fix needs live confirmation (95-102) | CCXT stays TS | **Out of scope.** Note in Phase 5 spike: CCXT is not exercised by parity work. |
@@ -1540,7 +1540,7 @@ Each `TODO.md` item below overlaps with the Rust migration. Per-item fate:
 
 **Latency budget.** `RustUtaProxy` round-trip target: ≤5 ms per call on Mock. Phase 4f parity test asserts `Promise.all([5 UTAs].map(u => u.getOrders()))` completes in ≤50 ms.
 
-**Interleaving hazard.** `getPortfolio` does back-to-back `uta.getPositions()` + `uta.getAccount()` ([:190-191](../src/tool/trading.ts:190)) expecting consistent state. Under the actor model, a `commit` from another tool call can interleave between the two `await`s. **v4 accepts current inconsistency** for parity (locked in [v4 open decisions](../docs/superpowers/decisions/2026-05-05-v4-open-decisions.md#decision-3)). A `getPortfolioSnapshot` actor command for atomic reads is reserved for post-migration improvement.
+**Interleaving hazard.** `getPortfolio` does back-to-back `uta.getPositions()` + `uta.getAccount()` ([:190-191](../src/tool/trading.ts:190)) expecting consistent state. Under the actor model, a `commit` from another tool call can interleave between the two `await`s. **v4 accepts current inconsistency** for parity (locked in [v4 open decisions](superpowers/decisions/2026-05-05-v4-open-decisions.md#decision-3)). A `getPortfolioSnapshot` actor command for atomic reads is reserved for post-migration improvement.
 
 ### 6.15 Cross-UTA semantics
 
@@ -1563,6 +1563,8 @@ Documented explicitly so post-migration debugging doesn't blame the actor model.
 **Rule:** any future consumer added to this list specifies (1) which UTA methods it calls, (2) latency budget, (3) behavior under FFI backpressure (queue full, panic, timeout). The matrix is the load-bearing artifact for §6.12 / P14.
 
 ### 6.17 Mixed-version commit log loader
+
+> **Renumber note:** Was §6.13 in v3; renumbered to §6.17 in v4 to make room for new §6.13–§6.16. Content unchanged.
 
 Both TS and Rust must load logs containing v1 + v2-intent-only + v2-with-entry-hash commits in any order. The decoder model:
 
