@@ -257,3 +257,54 @@ the item when done — git log is the history.
       once we have a stable mark-price source for non-Pyth-feed pairs.
 
 ## (seed more areas as they come up)
+
+## Rust migration v4 — deferred items
+
+### Snapshot durability gaps `[snapshot-durability]`
+
+Three durability gaps in `src/domain/trading/snapshot/store.ts` that the
+Rust migration's missing-snapshot reconciler does NOT close. See v4
+§6.4.1 for full diagnosis.
+
+- **Non-atomic chunk append** (`store.ts:83`). Raw `appendFile` for chunks
+  produces partial last lines on crash. Reconciler counts on `chunk.count`
+  from index — corruption invisible until parse.
+- **No `fsync`** (`store.ts:51-56`). `rename(tmp, indexPath)` lacks fsync of
+  file or parent dir.
+- **Index/chunk write inconsistency** (`store.ts:83-84`). Chunk written
+  before index update; crash between leaves chunk-without-index, reconciler
+  emits a duplicate.
+
+Mitigation candidates (not adopted in this migration): chunk append over
+fsync'd write+rename pairs; transactional index+chunk via two-phase
+rename; reconciler duplicate-detection step.
+
+### Trading git staging area lost on restart `[migration-deferred]`
+
+`TradingGit.stagingArea`, `pendingMessage`, `pendingHash`, `currentRound`
+at `src/domain/trading/git/TradingGit.ts:41-46` are RAM-only. The Rust
+migration ports the bug as-is (parity); fix lands post-Phase-7 in a
+separate PR that updates both TS and Rust impls together. See v4 §6.13
+row 1.
+
+### Cooldown guard state lost on restart `[migration-deferred]`
+
+`CooldownGuard.lastTradeTime` at `src/domain/trading/guards/cooldown.ts:9,30`
+is in-memory. Rust port preserves the bug for parity; fix is a post-Phase-7
+PR. See v4 §6.13 row 2.
+
+### LeverUp broker — Rust scope `[v4-revisit]`
+
+LeverUp stays TS-only for now (decision doc:
+`docs/superpowers/decisions/2026-05-05-v4-open-decisions.md`#decision-1).
+Revisit post-Phase-7 once LeverUp's TS impl stabilizes. The Phase 4b
+`Broker` trait already includes `BrokerCapabilities` so a future Rust port
+doesn't require trait-shape rework.
+
+### `UNSET_LONG` JS precision bug `[migration-known]`
+
+`packages/ibkr/src/const.ts:12` defines
+`UNSET_LONG = BigInt(2 ** 63) - 1n`. The `2 ** 63` is computed as a JS
+Number, exceeding `Number.MAX_SAFE_INTEGER` and rounding. v4 §6.1
+caveats: any Rust `i64` field reconstruction must derive `i64::MAX`
+canonically, not from this lossy TS source. Phase 1b adds a fixture.
