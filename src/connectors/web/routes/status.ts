@@ -1,9 +1,10 @@
 import { Hono } from 'hono'
 import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const startedAt = process.hrtime.bigint()
-const packageJson = JSON.parse(readFileSync(resolve('package.json'), 'utf-8')) as { version: string }
+const packageJsonPath = fileURLToPath(new URL('../../../../package.json', import.meta.url))
+const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as { version: string }
 
 /** Release-gate health endpoint — referenced by RUST_MIGRATION_PLAN.v4.md §3.4. */
 export function createStatusRoutes() {
