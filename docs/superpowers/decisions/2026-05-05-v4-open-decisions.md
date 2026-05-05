@@ -10,6 +10,7 @@ TODO.md entry tracked in a future migration phase.
 
 ---
 
+<a id="decision-1"></a>
 ## Decision 1 — §4.4 LeverUp scope
 
 **Question:** Does LeverUp join the Rust port path, or stay TS-only like CCXT?
@@ -29,6 +30,7 @@ fact, not recommendation. §5 Phase 5 explicitly says "LeverUp NOT in scope."
 
 ---
 
+<a id="decision-2"></a>
 ## Decision 2 — §6.13 TODO.md as-is items
 
 **Question:** Port "trading-git staging area lost on restart" and "cooldown
@@ -48,6 +50,7 @@ bodies.
 
 ---
 
+<a id="decision-3"></a>
 ## Decision 3 — §6.14 `getPortfolio` interleaving
 
 **Question:** Accept current inconsistency between back-to-back
@@ -68,6 +71,7 @@ path; option (b) is documented for future revisit.
 
 ---
 
+<a id="decision-4"></a>
 ## Decision 4 — §6.12.1 panic dedup threshold
 
 **Question:** N consecutive `RUST_PANIC` errors → mark UTA disabled. What

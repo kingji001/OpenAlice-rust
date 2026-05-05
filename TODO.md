@@ -295,8 +295,8 @@ PR. See v4 §6.13 row 2.
 
 ### LeverUp broker — Rust scope `[v4-revisit]`
 
-LeverUp stays TS-only for now (decision doc:
-`docs/superpowers/decisions/2026-05-05-v4-open-decisions.md`#decision-1).
+LeverUp stays TS-only for now — see
+[v4 open decisions, decision 1](docs/superpowers/decisions/2026-05-05-v4-open-decisions.md#decision-1).
 Revisit post-Phase-7 once LeverUp's TS impl stabilizes. The Phase 4b
 `Broker` trait already includes `BrokerCapabilities` so a future Rust port
 doesn't require trait-shape rework.
