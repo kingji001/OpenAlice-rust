@@ -1,0 +1,8 @@
+{
+  "description": "Order.minQty set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "minQty",
+  "fieldKind": "integer",
+  "name": "Order-minQty-unset",
+  "sentinel": 2147483647,
+  "type": "Order"
+}

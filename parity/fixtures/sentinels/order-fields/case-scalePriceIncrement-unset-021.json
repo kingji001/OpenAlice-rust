@@ -1,0 +1,8 @@
+{
+  "description": "Order.scalePriceIncrement set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "scalePriceIncrement",
+  "fieldKind": "double",
+  "name": "Order-scalePriceIncrement-unset",
+  "sentinel": 1.7976931348623157e+308,
+  "type": "Order"
+}

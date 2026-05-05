@@ -1,0 +1,9 @@
+{
+  "description": "Execution with every value-or-unset field at its sentinel.",
+  "fields": {
+    "cumQty": "170141183460469231731687303715884105727",
+    "shares": "170141183460469231731687303715884105727"
+  },
+  "name": "Execution-all-unset",
+  "type": "Execution"
+}

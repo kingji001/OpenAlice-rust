@@ -1,0 +1,8 @@
+{
+  "description": "Contract.lastPricePrecision set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "lastPricePrecision",
+  "fieldKind": "decimal",
+  "name": "Contract-lastPricePrecision-unset",
+  "sentinel": "170141183460469231731687303715884105727",
+  "type": "Contract"
+}

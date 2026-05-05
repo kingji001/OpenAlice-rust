@@ -1,0 +1,20 @@
+{
+  "description": "OrderState with every value-or-unset field at its sentinel.",
+  "fields": {
+    "commissionAndFees": 1.7976931348623157e+308,
+    "equityWithLoanAfterOutsideRTH": 1.7976931348623157e+308,
+    "equityWithLoanBeforeOutsideRTH": 1.7976931348623157e+308,
+    "equityWithLoanChangeOutsideRTH": 1.7976931348623157e+308,
+    "initMarginAfterOutsideRTH": 1.7976931348623157e+308,
+    "initMarginBeforeOutsideRTH": 1.7976931348623157e+308,
+    "initMarginChangeOutsideRTH": 1.7976931348623157e+308,
+    "maintMarginAfterOutsideRTH": 1.7976931348623157e+308,
+    "maintMarginBeforeOutsideRTH": 1.7976931348623157e+308,
+    "maintMarginChangeOutsideRTH": 1.7976931348623157e+308,
+    "maxCommissionAndFees": 1.7976931348623157e+308,
+    "minCommissionAndFees": 1.7976931348623157e+308,
+    "suggestedSize": "170141183460469231731687303715884105727"
+  },
+  "name": "OrderState-all-unset",
+  "type": "OrderState"
+}

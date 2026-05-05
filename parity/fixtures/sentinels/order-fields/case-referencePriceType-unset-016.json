@@ -1,0 +1,8 @@
+{
+  "description": "Order.referencePriceType set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "referencePriceType",
+  "fieldKind": "integer",
+  "name": "Order-referencePriceType-unset",
+  "sentinel": 2147483647,
+  "type": "Order"
+}

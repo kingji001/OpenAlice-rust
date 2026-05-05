@@ -1,0 +1,14 @@
+{
+  "description": "Contract with every value-or-unset field at its sentinel.",
+  "fields": {
+    "lastPricePrecision": "170141183460469231731687303715884105727",
+    "lastSizePrecision": "170141183460469231731687303715884105727",
+    "minAlgoSize": "170141183460469231731687303715884105727",
+    "minSize": "170141183460469231731687303715884105727",
+    "sizeIncrement": "170141183460469231731687303715884105727",
+    "strike": 1.7976931348623157e+308,
+    "suggestedSizeIncrement": "170141183460469231731687303715884105727"
+  },
+  "name": "Contract-all-unset",
+  "type": "Contract"
+}

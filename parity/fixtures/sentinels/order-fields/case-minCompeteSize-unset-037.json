@@ -1,0 +1,8 @@
+{
+  "description": "Order.minCompeteSize set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "minCompeteSize",
+  "fieldKind": "integer",
+  "name": "Order-minCompeteSize-unset",
+  "sentinel": 2147483647,
+  "type": "Order"
+}

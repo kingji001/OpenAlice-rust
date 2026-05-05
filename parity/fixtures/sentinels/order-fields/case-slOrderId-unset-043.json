@@ -1,0 +1,8 @@
+{
+  "description": "Order.slOrderId set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "slOrderId",
+  "fieldKind": "integer",
+  "name": "Order-slOrderId-unset",
+  "sentinel": 2147483647,
+  "type": "Order"
+}

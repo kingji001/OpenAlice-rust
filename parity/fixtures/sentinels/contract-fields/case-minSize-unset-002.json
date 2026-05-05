@@ -1,0 +1,8 @@
+{
+  "description": "Contract.minSize set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "minSize",
+  "fieldKind": "decimal",
+  "name": "Contract-minSize-unset",
+  "sentinel": "170141183460469231731687303715884105727",
+  "type": "Contract"
+}

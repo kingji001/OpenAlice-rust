@@ -1,0 +1,8 @@
+{
+  "description": "OrderState.suggestedSize set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "suggestedSize",
+  "fieldKind": "decimal",
+  "name": "OrderState-suggestedSize-unset",
+  "sentinel": "170141183460469231731687303715884105727",
+  "type": "OrderState"
+}

@@ -1,0 +1,8 @@
+{
+  "description": "Order.scaleProfitOffset set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "scaleProfitOffset",
+  "fieldKind": "double",
+  "name": "Order-scaleProfitOffset-unset",
+  "sentinel": 1.7976931348623157e+308,
+  "type": "Order"
+}

@@ -1,0 +1,8 @@
+{
+  "description": "Order.duration set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "duration",
+  "fieldKind": "integer",
+  "name": "Order-duration-unset",
+  "sentinel": 2147483647,
+  "type": "Order"
+}

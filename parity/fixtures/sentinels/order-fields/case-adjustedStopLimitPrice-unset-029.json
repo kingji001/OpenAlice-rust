@@ -1,0 +1,8 @@
+{
+  "description": "Order.adjustedStopLimitPrice set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "adjustedStopLimitPrice",
+  "fieldKind": "double",
+  "name": "Order-adjustedStopLimitPrice-unset",
+  "sentinel": 1.7976931348623157e+308,
+  "type": "Order"
+}

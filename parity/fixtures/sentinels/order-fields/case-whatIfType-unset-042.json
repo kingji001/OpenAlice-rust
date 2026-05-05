@@ -1,0 +1,8 @@
+{
+  "description": "Order.whatIfType set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "whatIfType",
+  "fieldKind": "integer",
+  "name": "Order-whatIfType-unset",
+  "sentinel": 2147483647,
+  "type": "Order"
+}

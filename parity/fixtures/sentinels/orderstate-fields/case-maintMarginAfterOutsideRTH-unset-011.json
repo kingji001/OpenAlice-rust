@@ -1,0 +1,8 @@
+{
+  "description": "OrderState.maintMarginAfterOutsideRTH set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "maintMarginAfterOutsideRTH",
+  "fieldKind": "double",
+  "name": "OrderState-maintMarginAfterOutsideRTH-unset",
+  "sentinel": 1.7976931348623157e+308,
+  "type": "OrderState"
+}

@@ -1,0 +1,8 @@
+{
+  "description": "Order.competeAgainstBestOffset set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "competeAgainstBestOffset",
+  "fieldKind": "double",
+  "name": "Order-competeAgainstBestOffset-unset",
+  "sentinel": 1.7976931348623157e+308,
+  "type": "Order"
+}

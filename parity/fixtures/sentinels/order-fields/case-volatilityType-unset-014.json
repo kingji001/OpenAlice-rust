@@ -1,0 +1,8 @@
+{
+  "description": "Order.volatilityType set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "volatilityType",
+  "fieldKind": "integer",
+  "name": "Order-volatilityType-unset",
+  "sentinel": 2147483647,
+  "type": "Order"
+}

@@ -1,0 +1,8 @@
+{
+  "description": "Order.lmtPriceOffset set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "lmtPriceOffset",
+  "fieldKind": "double",
+  "name": "Order-lmtPriceOffset-unset",
+  "sentinel": 1.7976931348623157e+308,
+  "type": "Order"
+}

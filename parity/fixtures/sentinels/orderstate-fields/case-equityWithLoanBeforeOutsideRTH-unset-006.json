@@ -1,0 +1,8 @@
+{
+  "description": "OrderState.equityWithLoanBeforeOutsideRTH set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "equityWithLoanBeforeOutsideRTH",
+  "fieldKind": "double",
+  "name": "OrderState-equityWithLoanBeforeOutsideRTH-unset",
+  "sentinel": 1.7976931348623157e+308,
+  "type": "OrderState"
+}

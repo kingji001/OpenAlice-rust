@@ -1,0 +1,8 @@
+{
+  "description": "Order.scaleSubsLevelSize set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "scaleSubsLevelSize",
+  "fieldKind": "integer",
+  "name": "Order-scaleSubsLevelSize-unset",
+  "sentinel": 2147483647,
+  "type": "Order"
+}

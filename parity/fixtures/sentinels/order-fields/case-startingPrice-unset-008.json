@@ -1,0 +1,8 @@
+{
+  "description": "Order.startingPrice set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "startingPrice",
+  "fieldKind": "double",
+  "name": "Order-startingPrice-unset",
+  "sentinel": 1.7976931348623157e+308,
+  "type": "Order"
+}

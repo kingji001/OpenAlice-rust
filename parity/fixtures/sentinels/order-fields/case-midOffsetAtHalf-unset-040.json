@@ -1,0 +1,8 @@
+{
+  "description": "Order.midOffsetAtHalf set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "midOffsetAtHalf",
+  "fieldKind": "double",
+  "name": "Order-midOffsetAtHalf-unset",
+  "sentinel": 1.7976931348623157e+308,
+  "type": "Order"
+}

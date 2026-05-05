@@ -1,0 +1,8 @@
+{
+  "description": "Order.stockRangeLower set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "stockRangeLower",
+  "fieldKind": "double",
+  "name": "Order-stockRangeLower-unset",
+  "sentinel": 1.7976931348623157e+308,
+  "type": "Order"
+}

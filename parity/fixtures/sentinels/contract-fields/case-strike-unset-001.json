@@ -1,0 +1,8 @@
+{
+  "description": "Contract.strike set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "strike",
+  "fieldKind": "double",
+  "name": "Contract-strike-unset",
+  "sentinel": 1.7976931348623157e+308,
+  "type": "Contract"
+}

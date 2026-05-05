@@ -1,0 +1,8 @@
+{
+  "description": "Order.cashQty set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "cashQty",
+  "fieldKind": "decimal",
+  "name": "Order-cashQty-unset",
+  "sentinel": "170141183460469231731687303715884105727",
+  "type": "Order"
+}

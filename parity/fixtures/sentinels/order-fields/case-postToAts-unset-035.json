@@ -1,0 +1,8 @@
+{
+  "description": "Order.postToAts set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "postToAts",
+  "fieldKind": "integer",
+  "name": "Order-postToAts-unset",
+  "sentinel": 2147483647,
+  "type": "Order"
+}

@@ -1,0 +1,8 @@
+{
+  "description": "Order.triggerPrice set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "triggerPrice",
+  "fieldKind": "double",
+  "name": "Order-triggerPrice-unset",
+  "sentinel": 1.7976931348623157e+308,
+  "type": "Order"
+}

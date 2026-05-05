@@ -1,0 +1,8 @@
+{
+  "description": "Order.manualOrderIndicator set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "manualOrderIndicator",
+  "fieldKind": "integer",
+  "name": "Order-manualOrderIndicator-unset",
+  "sentinel": 2147483647,
+  "type": "Order"
+}

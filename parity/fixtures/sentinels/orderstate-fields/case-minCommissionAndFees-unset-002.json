@@ -1,0 +1,8 @@
+{
+  "description": "OrderState.minCommissionAndFees set to its sentinel; all other numeric fields at non-sentinel default.",
+  "field": "minCommissionAndFees",
+  "fieldKind": "double",
+  "name": "OrderState-minCommissionAndFees-unset",
+  "sentinel": 1.7976931348623157e+308,
+  "type": "OrderState"
+}
