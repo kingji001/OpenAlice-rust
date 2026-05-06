@@ -1,131 +1,66 @@
-# @traderalice/ibkr
+# @traderalice/ibkr (re-export shim)
 
-TypeScript port of the official IBKR TWS API v10.44.01.
+> ⚠️ **This package is a back-compat re-export shim.** v4 Phase 1a split
+> the original monolith into two packages — see below. New code should
+> depend on those directly.
 
-Translated from the [official Python client](https://interactivebrokers.github.io/) — not a wrapper around a third-party library. Zero supply chain risk.
+## What this package contains
 
-## Quick Start
+A two-line `src/index.ts` that re-exports both:
+
+- [`@traderalice/ibkr-types`](../ibkr-types/) — pure DTO classes (`Order`,
+  `Contract`, `ContractDetails`, `Execution`, `OrderState`, etc.), enums,
+  and the `UNSET_*` sentinel constants. Zero I/O.
+- [`@traderalice/ibkr-client`](../ibkr-client/) — TWS API I/O layer:
+  `Connection`, `EReader`, `EClient`, `Decoder`, `EWrapper`, and the
+  protobuf-generated wire-format classes.
+
+## Why this shim exists
+
+v3 shipped a single `@traderalice/ibkr` package containing both the DTOs
+and the I/O layer. v4 Phase 1a (per
+[`docs/RUST_MIGRATION_PLAN.v4.md`](../../docs/RUST_MIGRATION_PLAN.v4.md))
+split them so the Rust port can target the type surface independently of
+the I/O implementation.
+
+This shim is kept for **≥1 minor release** after Phase 1a so existing
+consumers of `import … from '@traderalice/ibkr'` continue to work
+unchanged. Cleanup happens in Phase 8.
+
+## Quick Start (legacy path — still works)
 
 ```typescript
 import { EClient, DefaultEWrapper, Contract } from '@traderalice/ibkr'
-
-class MyWrapper extends DefaultEWrapper {
-  currentTime(time: number) {
-    console.log('Server time:', new Date(time * 1000))
-  }
-  contractDetails(reqId: number, details: ContractDetails) {
-    console.log(details.contract.symbol, details.longName)
-  }
-}
-
-const client = new EClient(new MyWrapper())
-await client.connect('127.0.0.1', 7497, 0) // paper trading
-
-client.reqCurrentTime()
-
-const contract = new Contract()
-contract.symbol = 'AAPL'
-contract.secType = 'STK'
-contract.exchange = 'SMART'
-contract.currency = 'USD'
-client.reqContractDetails(1, contract)
 ```
 
-## Architecture
+## Quick Start (new code, recommended)
 
-```
-EClient  ──send──►  TWS/IB Gateway  ──respond──►  Decoder  ──call──►  EWrapper
-(requests)          (localhost TCP)                (parse)             (callbacks)
-```
+```typescript
+// Just the data classes
+import { Contract, Order, UNSET_DECIMAL } from '@traderalice/ibkr-types'
 
-**EClient** encodes and sends requests. **Decoder** parses responses (text or protobuf) and calls methods on your **EWrapper** implementation. You override only the callbacks you care about.
-
-### Dual Protocol
-
-TWS v201+ uses protobuf for most messages. Older versions use a text protocol (`\0`-delimited fields). Both are fully implemented. The protocol is negotiated at handshake — you don't need to think about it.
-
-## Project Structure
-
-```
-src/
-├── client/                  # EClient — request encoding
-│   ├── base.ts              # Connection, handshake, sendMsg
-│   ├── encode.ts            # Shared contract field serialization
-│   ├── market-data.ts       # reqMktData, reqTickByTick, etc.
-│   ├── orders.ts            # placeOrder, cancelOrder, reqOpenOrders
-│   ├── account.ts           # reqAccountSummary, reqPositions, reqPnL
-│   ├── historical.ts        # reqHistoricalData, reqScanner, reqNews
-│   └── index.ts             # Assembles mixins onto EClient
-│
-├── decoder/                 # Decoder — response parsing
-│   ├── base.ts              # Decoder class, interpret(), processProtoBuf()
-│   ├── market-data.ts       # Tick, depth, market data type handlers
-│   ├── orders.ts            # Order status, open/completed order handlers
-│   ├── account.ts           # Account, position, PnL handlers
-│   ├── contract.ts          # Contract details, symbol samples handlers
-│   ├── execution.ts         # Execution, commission report handlers
-│   ├── historical.ts        # Historical data, realtime bars handlers
-│   ├── misc.ts              # News, scanner, verify, WSH, config handlers
-│   └── index.ts             # Assembles all handler groups
-│
-├── protobuf/                # Auto-generated from .proto (not in git)
-│   └── *.ts                 # 203 files, generated via `pnpm generate:proto`
-│
-├── wrapper.ts               # EWrapper interface + DefaultEWrapper
-├── order-decoder.ts         # Version-gated order field extraction
-├── comm.ts                  # Message framing (length prefix + NULL fields)
-├── connection.ts            # TCP socket wrapper (net.Socket)
-├── reader.ts                # Socket data → framed messages
-├── utils.ts                 # Field decode, formatting, validation
-│
-├── contract.ts, order.ts, execution.ts, ...  # Data models
-├── const.ts, errors.ts, server-versions.ts   # Constants
-├── message.ts               # IN/OUT message ID enums
-└── index.ts                 # Public API re-exports
+// The I/O layer
+import { EClient, DefaultEWrapper } from '@traderalice/ibkr-client'
 ```
 
-### Why the split?
+## Tests
 
-Both `client/` and `decoder/` are split by message category (market-data, orders, account, etc.) instead of being single monolithic files. This keeps each file under 500 lines — manageable for both humans and AI-assisted development.
-
-## Reference Source
-
-`ref/` contains the official IBKR TWS API distribution (v10.44.01):
-
-- `ref/source/proto/` — 203 `.proto` files (protocol source of truth)
-- `ref/source/pythonclient/ibapi/` — Python client (translation reference)
-- `ref/samples/Python/Testbed/` — Usage examples
-
-Java/C++ sources are in `.gitignore` (available locally after extracting the TWS API zip).
-
-## Testing
+8 test files live here: 5 unit specs + 3 e2e specs (the e2e specs require
+live IBKR paper-trading credentials). Two unit specs that need access to
+internals not exposed by the shim — `utils.spec.ts` and
+`protobuf-decode.spec.ts` — moved to `packages/ibkr-client/tests/` during
+Phase 1a.
 
 ```bash
-pnpm test          # Unit tests (56 tests, no external deps)
-pnpm test:e2e      # Integration tests (needs TWS/IB Gateway running)
-pnpm test:all      # Both
+pnpm test          # 5 unit specs
+pnpm test:e2e      # 3 e2e specs (requires IBKR Gateway/TWS at localhost:4002)
 ```
 
-E2e tests share a single TWS connection via `tests/e2e/setup.ts`. If TWS is not running, e2e tests skip automatically.
+## Proto generation
 
-### TWS Ports
-
-| Mode | TWS | IB Gateway |
-|------|-----|------------|
-| Paper | 7497 | 4002 |
-| Live | 7496 | 4001 |
-
-Configure via env: `TWS_HOST=127.0.0.1 TWS_PORT=7497`
-
-## Protobuf Generation
-
-The `src/protobuf/` directory is auto-generated and git-ignored. To regenerate:
+The `generate:proto` script and the `ref/source/proto/` source files
+moved to `packages/ibkr-client/` during Phase 1a:
 
 ```bash
-brew install protobuf          # needs protoc
-pnpm generate:proto            # runs protoc with ts-proto plugin
+pnpm --filter @traderalice/ibkr-client generate:proto
 ```
-
-## Relationship to Official API
-
-This is a mechanical translation of the official Python `ibapi` package. Method names, field names, and message IDs are kept identical for cross-reference. When debugging, you can compare any handler against the same-named method in `ref/source/pythonclient/ibapi/`.
