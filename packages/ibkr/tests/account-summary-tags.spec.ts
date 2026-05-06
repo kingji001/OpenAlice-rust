@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { AccountSummaryTags, AllTags } from '../src/account-summary-tags.js'
+import { AccountSummaryTags, AllTags } from '@traderalice/ibkr'
 
 describe('AccountSummaryTags', () => {
   it('AllTags is a comma-separated list of all tag values', () => {

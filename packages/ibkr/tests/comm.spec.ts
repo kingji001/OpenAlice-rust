@@ -4,8 +4,18 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { makeInitialMsg, makeField, makeFieldHandleEmpty, makeMsg, makeMsgProto, readMsg, readFields } from '../src/comm.js'
-import { UNSET_DOUBLE, UNSET_INTEGER, DOUBLE_INFINITY } from '../src/const.js'
+import {
+  makeInitialMsg,
+  makeField,
+  makeFieldHandleEmpty,
+  makeMsg,
+  makeMsgProto,
+  readMsg,
+  readFields,
+  UNSET_DOUBLE,
+  UNSET_INTEGER,
+  DOUBLE_INFINITY,
+} from '@traderalice/ibkr'
 
 describe('comm', () => {
 

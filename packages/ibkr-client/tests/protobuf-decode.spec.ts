@@ -12,7 +12,7 @@ import { CurrentTime } from '../src/protobuf/CurrentTime.js'
 import { NextValidId } from '../src/protobuf/NextValidId.js'
 import { ErrorMessage } from '../src/protobuf/ErrorMessage.js'
 import { ManagedAccounts } from '../src/protobuf/ManagedAccounts.js'
-import { IN } from '../src/message.js'
+import { IN } from '@traderalice/ibkr-types'
 
 function encodeProto<T>(codec: { encode(msg: T, writer?: BinaryWriter): BinaryWriter }, msg: T): Buffer {
   const bytes = codec.encode(msg).finish()

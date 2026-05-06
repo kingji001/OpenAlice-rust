@@ -3,13 +3,20 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { Contract, ContractDetails, ComboLeg } from '../src/contract.js'
-import { Order } from '../src/order.js'
-import { OrderState } from '../src/order-state.js'
-import { Execution, ExecutionFilter } from '../src/execution.js'
-import { TagValue } from '../src/tag-value.js'
-import { SoftDollarTier } from '../src/softdollartier.js'
-import { UNSET_DOUBLE, UNSET_INTEGER, UNSET_DECIMAL } from '../src/const.js'
+import {
+  Contract,
+  ContractDetails,
+  ComboLeg,
+  Order,
+  OrderState,
+  Execution,
+  ExecutionFilter,
+  TagValue,
+  SoftDollarTier,
+  UNSET_DOUBLE,
+  UNSET_INTEGER,
+  UNSET_DECIMAL,
+} from '@traderalice/ibkr'
 
 describe('Contract', () => {
   it('has sensible defaults', () => {

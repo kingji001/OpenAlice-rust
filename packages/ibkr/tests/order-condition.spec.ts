@@ -13,7 +13,7 @@ import {
   TriggerMethodEnum,
   Create,
   OrderCondition,
-} from '../src/order-condition.js'
+} from '@traderalice/ibkr'
 
 describe('OrderCondition', () => {
   it('can construct all condition types', () => {
