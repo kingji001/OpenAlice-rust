@@ -6,20 +6,12 @@
 
 import Decimal from 'decimal.js'
 import type { Decoder } from './base.js'
-import { IN } from '../message.js'
-import { NO_VALID_ID, UNSET_DECIMAL } from '../const.js'
 import {
-  decodeStr,
-  decodeInt,
-  decodeFloat,
-  decodeBool,
-  decodeDecimal,
-} from '../utils.js'
-import {
+  IN,
+  NO_VALID_ID,
+  UNSET_DECIMAL,
   MIN_SERVER_VER_SYNT_REALTIME_BARS,
   MIN_SERVER_VER_HISTORICAL_DATA_END,
-} from '../server-versions.js'
-import {
   BarData,
   RealTimeBar,
   HistogramData,
@@ -29,7 +21,14 @@ import {
   HistoricalSession,
   TickAttribBidAsk,
   TickAttribLast,
-} from '../common.js'
+} from '@traderalice/ibkr-types'
+import {
+  decodeStr,
+  decodeInt,
+  decodeFloat,
+  decodeBool,
+  decodeDecimal,
+} from '../utils.js'
 // Protobuf message types
 import { HistoricalData as HistoricalDataProto } from '../protobuf/HistoricalData.js'
 import { HistoricalDataUpdate as HistoricalDataUpdateProto } from '../protobuf/HistoricalDataUpdate.js'

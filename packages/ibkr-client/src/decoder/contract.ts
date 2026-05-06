@@ -15,8 +15,8 @@
 
 import Decimal from 'decimal.js'
 import type { Decoder } from './base.js'
-import { IN } from '../message.js'
 import {
+  IN,
   Contract,
   ContractDetails,
   ContractDescription,
@@ -24,18 +24,9 @@ import {
   ComboLeg,
   FundDistributionPolicyIndicator,
   FundAssetType,
-} from '../contract.js'
-import { TagValue } from '../tag-value.js'
-import { PriceIncrement } from '../common.js'
-import { IneligibilityReason } from '../ineligibility-reason.js'
-import {
-  decodeStr,
-  decodeInt,
-  decodeFloat,
-  decodeBool,
-  decodeDecimal,
-} from '../utils.js'
-import {
+  TagValue,
+  PriceIncrement,
+  IneligibilityReason,
   MIN_SERVER_VER_SIZE_RULES,
   MIN_SERVER_VER_MD_SIZE_MULTIPLIER,
   MIN_SERVER_VER_ENCODE_MSG_ASCII7,
@@ -50,8 +41,15 @@ import {
   MIN_SERVER_VER_LAST_TRADE_DATE,
   MIN_SERVER_VER_BOND_TRADING_HOURS,
   MIN_SERVER_VER_BOND_ISSUERID,
-} from '../server-versions.js'
-import { NO_VALID_ID } from '../const.js'
+  NO_VALID_ID,
+} from '@traderalice/ibkr-types'
+import {
+  decodeStr,
+  decodeInt,
+  decodeFloat,
+  decodeBool,
+  decodeDecimal,
+} from '../utils.js'
 
 // Protobuf message types
 import { ContractData as ContractDataProto } from '../protobuf/ContractData.js'

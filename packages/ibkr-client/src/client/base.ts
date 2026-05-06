@@ -10,16 +10,16 @@ import { Connection } from '../connection.js'
 import { EReader } from '../reader.js'
 import { Decoder, applyAllHandlers } from '../decoder/index.js'
 import type { EWrapper } from '../wrapper.js'
-import { OUT } from '../message.js'
 import {
+  OUT,
   MIN_CLIENT_VER,
   MAX_CLIENT_VER,
   MIN_SERVER_VER_OPTIONAL_CAPABILITIES,
   MIN_SERVER_VER_PROTOBUF,
-} from '../server-versions.js'
-import { NO_VALID_ID } from '../const.js'
-import { PROTOBUF_MSG_IDS } from '../common.js'
-import * as errors from '../errors.js'
+  NO_VALID_ID,
+  PROTOBUF_MSG_IDS,
+} from '@traderalice/ibkr-types'
+import * as errors from '@traderalice/ibkr-types'
 import { ClientException, isAsciiPrintable, currentTimeMillis } from '../utils.js'
 
 export class EClient {

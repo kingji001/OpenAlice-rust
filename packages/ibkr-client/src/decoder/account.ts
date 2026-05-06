@@ -5,8 +5,15 @@
  */
 
 import { Decoder } from './base.js'
-import { IN } from '../message.js'
-import { NO_VALID_ID, UNSET_DOUBLE, UNSET_DECIMAL } from '../const.js'
+import {
+  IN,
+  NO_VALID_ID,
+  UNSET_DOUBLE,
+  UNSET_DECIMAL,
+  MIN_SERVER_VER_UNREALIZED_PNL,
+  MIN_SERVER_VER_REALIZED_PNL,
+  Contract,
+} from '@traderalice/ibkr-types'
 import {
   decodeStr,
   decodeInt,
@@ -14,11 +21,6 @@ import {
   decodeDecimal,
   floatMaxString,
 } from '../utils.js'
-import {
-  MIN_SERVER_VER_UNREALIZED_PNL,
-  MIN_SERVER_VER_REALIZED_PNL,
-} from '../server-versions.js'
-import { Contract } from '../contract.js'
 import Decimal from 'decimal.js'
 
 // Protobuf message types

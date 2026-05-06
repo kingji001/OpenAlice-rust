@@ -13,8 +13,33 @@
 
 import Decimal from 'decimal.js'
 import type { Decoder } from './base.js'
-import { IN } from '../message.js'
-import { UNSET_INTEGER, UNSET_DOUBLE, UNSET_DECIMAL } from '../const.js'
+import {
+  IN,
+  UNSET_INTEGER,
+  UNSET_DOUBLE,
+  UNSET_DECIMAL,
+  MIN_SERVER_VER_MARKET_CAP_PRICE,
+  MIN_SERVER_VER_ORDER_CONTAINER,
+  MIN_SERVER_VER_AUTO_CANCEL_PARENT,
+  MIN_SERVER_VER_IMBALANCE_ONLY,
+  Contract,
+  ComboLeg,
+  DeltaNeutralContract,
+  Order,
+  OrderComboLeg,
+  OrderState,
+  OrderAllocation,
+  SoftDollarTier,
+  TagValue,
+  OrderCondition,
+  PriceCondition,
+  TimeCondition,
+  MarginCondition,
+  ExecutionCondition,
+  VolumeCondition,
+  PercentChangeCondition,
+} from '@traderalice/ibkr-types'
+import { OrderDecoder } from './order.js'
 import {
   decodeStr,
   decodeInt,
@@ -24,27 +49,6 @@ import {
   decimalMaxString,
   isValidIntValue,
 } from '../utils.js'
-import {
-  MIN_SERVER_VER_MARKET_CAP_PRICE,
-  MIN_SERVER_VER_ORDER_CONTAINER,
-  MIN_SERVER_VER_AUTO_CANCEL_PARENT,
-  MIN_SERVER_VER_IMBALANCE_ONLY,
-} from '../server-versions.js'
-import { OrderDecoder } from '../order-decoder.js'
-import { Contract, ComboLeg, DeltaNeutralContract } from '../contract.js'
-import { Order, OrderComboLeg } from '../order.js'
-import { OrderState, OrderAllocation } from '../order-state.js'
-import { SoftDollarTier } from '../softdollartier.js'
-import { TagValue } from '../tag-value.js'
-import {
-  OrderCondition,
-  PriceCondition,
-  TimeCondition,
-  MarginCondition,
-  ExecutionCondition,
-  VolumeCondition,
-  PercentChangeCondition,
-} from '../order-condition.js'
 
 // Protobuf message types
 import { OrderStatus as OrderStatusProto } from '../protobuf/OrderStatus.js'

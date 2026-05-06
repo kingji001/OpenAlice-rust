@@ -9,7 +9,20 @@
 
 import Decimal from 'decimal.js'
 import type { Decoder } from './base.js'
-import { IN } from '../message.js'
+import {
+  IN,
+  MIN_SERVER_VER_LAST_LIQUIDITY,
+  MIN_SERVER_VER_MODELS_SUPPORT,
+  MIN_SERVER_VER_PENDING_PRICE_REVISION,
+  MIN_SERVER_VER_SUBMITTER,
+  NO_VALID_ID,
+  Contract,
+  ComboLeg,
+  DeltaNeutralContract,
+  Execution,
+  OptionExerciseType,
+  CommissionAndFeesReport,
+} from '@traderalice/ibkr-types'
 import {
   decodeStr,
   decodeInt,
@@ -17,16 +30,6 @@ import {
   decodeBool,
   decodeDecimal,
 } from '../utils.js'
-import {
-  MIN_SERVER_VER_LAST_LIQUIDITY,
-  MIN_SERVER_VER_MODELS_SUPPORT,
-  MIN_SERVER_VER_PENDING_PRICE_REVISION,
-  MIN_SERVER_VER_SUBMITTER,
-} from '../server-versions.js'
-import { NO_VALID_ID } from '../const.js'
-import { Contract, ComboLeg, DeltaNeutralContract } from '../contract.js'
-import { Execution, OptionExerciseType } from '../execution.js'
-import { CommissionAndFeesReport } from '../commission-and-fees-report.js'
 
 // Protobuf message types
 import { ExecutionDetails as ExecutionDetailsProto } from '../protobuf/ExecutionDetails.js'

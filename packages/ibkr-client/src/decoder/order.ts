@@ -3,24 +3,22 @@
  */
 
 import Decimal from 'decimal.js'
-import { UNSET_DOUBLE, UNSET_INTEGER, UNSET_DECIMAL } from './const.js'
-import { Contract, ComboLeg, DeltaNeutralContract } from './contract.js'
-import { Order, OrderComboLeg } from './order.js'
-import { OrderState, OrderAllocation } from './order-state.js'
-import { OrderCondition, Create as createOrderCondition } from './order-condition.js'
-import { SoftDollarTier } from './softdollartier.js'
-import { TagValue } from './tag-value.js'
-import { IneligibilityReason } from './ineligibility-reason.js'
 import {
-  decodeStr,
-  decodeInt,
-  decodeFloat,
-  decodeBool,
-  decodeDecimal,
-  SHOW_UNSET,
-  isPegBenchOrder,
-} from './utils.js'
-import {
+  UNSET_DOUBLE,
+  UNSET_INTEGER,
+  UNSET_DECIMAL,
+  Contract,
+  ComboLeg,
+  DeltaNeutralContract,
+  Order,
+  OrderComboLeg,
+  OrderState,
+  OrderAllocation,
+  OrderCondition,
+  Create as createOrderCondition,
+  SoftDollarTier,
+  TagValue,
+  IneligibilityReason,
   MIN_SERVER_VER_FA_PROFILE_DESUPPORT,
   MIN_SERVER_VER_MODELS_SUPPORT,
   MIN_SERVER_VER_SSHORTX_OLD,
@@ -43,7 +41,16 @@ import {
   MIN_SERVER_VER_CME_TAGGING_FIELDS_IN_OPEN_ORDER,
   MIN_SERVER_VER_FULL_ORDER_PREVIEW_FIELDS,
   MIN_SERVER_VER_SUBMITTER,
-} from './server-versions.js'
+} from '@traderalice/ibkr-types'
+import {
+  decodeStr,
+  decodeInt,
+  decodeFloat,
+  decodeBool,
+  decodeDecimal,
+  SHOW_UNSET,
+  isPegBenchOrder,
+} from '../utils.js'
 
 export class OrderDecoder {
   contract: Contract

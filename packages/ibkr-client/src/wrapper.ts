@@ -13,12 +13,10 @@ import type {
   ContractDetails,
   ContractDescription,
   DeltaNeutralContract,
-} from './contract.js';
-import type { Order } from './order.js';
-import type { OrderState } from './order-state.js';
-import type { Execution } from './execution.js';
-import type { CommissionAndFeesReport } from './commission-and-fees-report.js';
-import type {
+  Order,
+  OrderState,
+  Execution,
+  CommissionAndFeesReport,
   BarData,
   RealTimeBar,
   HistogramData,
@@ -35,11 +33,11 @@ import type {
   TickAttrib,
   TickAttribBidAsk,
   TickAttribLast,
-} from './common.js';
-import type { SoftDollarTier } from './softdollartier.js';
-import type { IneligibilityReason } from './ineligibility-reason.js';
-import type { TagValue } from './tag-value.js';
-import type { ScanData } from './scanner.js';
+  SoftDollarTier,
+  IneligibilityReason,
+  TagValue,
+  ScanData,
+} from '@traderalice/ibkr-types';
 
 // ---------------------------------------------------------------------------
 // EWrapper interface

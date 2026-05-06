@@ -5,15 +5,11 @@
 
 import { EClient } from './base.js'
 import { makeField, makeFieldHandleEmpty } from '../comm.js'
-import { OUT } from '../message.js'
-import * as SV from '../server-versions.js'
-import { NO_VALID_ID, UNSET_DOUBLE, UNSET_INTEGER, UNSET_DECIMAL } from '../const.js'
-import * as errors from '../errors.js'
+import { OUT, NO_VALID_ID, UNSET_DOUBLE, UNSET_INTEGER, UNSET_DECIMAL, COMPETE_AGAINST_BEST_OFFSET_UP_TO_MID } from '@traderalice/ibkr-types'
+import * as SV from '@traderalice/ibkr-types'
+import * as errors from '@traderalice/ibkr-types'
 import { currentTimeMillis, isPegBenchOrder, isPegBestOrder, isPegMidOrder } from '../utils.js'
-import { COMPETE_AGAINST_BEST_OFFSET_UP_TO_MID } from '../order.js'
-import type { Contract } from '../contract.js'
-import type { Order } from '../order.js'
-import type { OrderCancel } from '../order-cancel.js'
+import type { Contract, Order, OrderCancel } from '@traderalice/ibkr-types'
 
 declare module './base.js' {
   interface EClient {

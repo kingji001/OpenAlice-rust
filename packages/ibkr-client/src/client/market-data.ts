@@ -6,13 +6,11 @@
 import { EClient } from './base.js'
 import { encodeContractLegacy } from './encode.js'
 import { makeField, makeFieldHandleEmpty } from '../comm.js'
-import { OUT } from '../message.js'
-import * as SV from '../server-versions.js'
-import { NO_VALID_ID } from '../const.js'
-import * as errors from '../errors.js'
+import { OUT, NO_VALID_ID } from '@traderalice/ibkr-types'
+import * as SV from '@traderalice/ibkr-types'
+import * as errors from '@traderalice/ibkr-types'
 import { currentTimeMillis } from '../utils.js'
-import type { Contract } from '../contract.js'
-import type { TagValueList } from '../tag-value.js'
+import type { Contract, TagValueList } from '@traderalice/ibkr-types'
 
 declare module './base.js' {
   interface EClient {

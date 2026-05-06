@@ -6,9 +6,8 @@
  */
 
 import type { EWrapper } from '../wrapper.js'
-import { NO_VALID_ID } from '../const.js'
+import { NO_VALID_ID, BAD_MESSAGE, UNKNOWN_ID } from '@traderalice/ibkr-types'
 import { BadMessage, currentTimeMillis } from '../utils.js'
-import { BAD_MESSAGE, UNKNOWN_ID } from '../errors.js'
 
 export type TextHandler = (decoder: Decoder, fields: Iterator<string>) => void
 export type ProtoHandler = (decoder: Decoder, buf: Buffer) => void

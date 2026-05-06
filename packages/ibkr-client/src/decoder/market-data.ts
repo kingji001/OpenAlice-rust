@@ -4,17 +4,20 @@
  */
 
 import type { Decoder } from './base.js'
-import { IN } from '../message.js'
-import { NO_VALID_ID, UNSET_INTEGER, UNSET_DOUBLE, UNSET_DECIMAL } from '../const.js'
-import { decodeStr, decodeInt, decodeFloat, decodeBool, decodeDecimal } from '../utils.js'
 import {
+  IN,
+  NO_VALID_ID,
+  UNSET_INTEGER,
+  UNSET_DOUBLE,
+  UNSET_DECIMAL,
   MIN_SERVER_VER_PAST_LIMIT,
   MIN_SERVER_VER_PRE_OPEN_BID_ASK,
   MIN_SERVER_VER_SMART_DEPTH,
   MIN_SERVER_VER_PRICE_BASED_VOLATILITY,
-} from '../server-versions.js'
-import { TickAttrib } from '../common.js'
-import { TickTypeEnum } from '../tick-type.js'
+  TickAttrib,
+  TickTypeEnum,
+} from '@traderalice/ibkr-types'
+import { decodeStr, decodeInt, decodeFloat, decodeBool, decodeDecimal } from '../utils.js'
 import Decimal from 'decimal.js'
 
 // Proto imports
