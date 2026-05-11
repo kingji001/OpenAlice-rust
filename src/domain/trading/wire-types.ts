@@ -10,7 +10,7 @@
  */
 
 /** Canonical decimal-string form: no exponent, no leading +, no trailing
- *  decimal point, "0" for zero (never "-0"). Validated by wire-canonical-decimal.ts. */
+ *  decimal point, "0" for zero (never "-0"). Validated by canonical-decimal.ts. */
 export type DecimalString = string
 
 /** Decimal field on the wire. Sentinels (UNSET_DECIMAL = 2^127-1) become
