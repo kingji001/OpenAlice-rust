@@ -34,7 +34,7 @@ function rehydrateOrder(json: Record<string, unknown>): Order {
     if (wireType === 'WireDecimal') {
       const v = (json as Record<string, unknown>)[key]
       if (typeof v === 'string') {
-        ;(order as Record<string, unknown>)[key] = new Decimal(v)
+        ;(order as unknown as Record<string, unknown>)[key] = new Decimal(v)
       }
     }
   }
@@ -49,7 +49,7 @@ function rehydrateContract(json: Record<string, unknown>): Contract {
     if (wireType === 'WireDecimal') {
       const v = (json as Record<string, unknown>)[key]
       if (typeof v === 'string') {
-        ;(c as Record<string, unknown>)[key] = new Decimal(v)
+        ;(c as unknown as Record<string, unknown>)[key] = new Decimal(v)
       }
     }
   }
