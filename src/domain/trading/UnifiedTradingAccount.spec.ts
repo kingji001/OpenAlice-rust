@@ -161,7 +161,7 @@ describe('UTA — operation dispatch', () => {
   describe('modifyOrder', () => {
     it('calls broker.modifyOrder with orderId and changes', async () => {
       const spy = vi.spyOn(broker, 'modifyOrder')
-      const changes: Partial<Order> = { lmtPrice: 155, totalQuantity: new Decimal(20) } as any
+      const changes: Partial<Order> = { lmtPrice: new Decimal(155), totalQuantity: new Decimal(20) }
       uta.git.add({ action: 'modifyOrder', orderId: 'ord-123', changes })
       uta.git.commit('modify order')
       await uta.push()
@@ -169,7 +169,7 @@ describe('UTA — operation dispatch', () => {
       expect(spy).toHaveBeenCalledTimes(1)
       const [orderId, passedChanges] = spy.mock.calls[0]
       expect(orderId).toBe('ord-123')
-      expect(passedChanges.lmtPrice).toBe(155)
+      expect(passedChanges.lmtPrice!.equals(155)).toBe(true)
     })
   })
 })
