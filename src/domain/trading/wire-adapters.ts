@@ -161,3 +161,30 @@ export const wireToIbkrExecution = (w: WireExecution): Execution =>
   fromWire(w as unknown as Record<string, unknown>, EXECUTION_SCHEMA, Execution)
 export const wireToIbkrOrderState = (w: WireOrderState): OrderState =>
   fromWire(w as unknown as Record<string, unknown>, ORDER_STATE_SCHEMA, OrderState)
+
+// ---- Partial-Order wire support (for Operation.modifyOrder.changes) ----
+
+/**
+ * Like toWire but accepts a partial source. Fields present in `partial`
+ * AND in the schema are wrapped; non-schema fields pass through; absent
+ * fields stay absent. Used for Operation.modifyOrder.changes (Partial<Order>).
+ */
+export function partialToWire<T extends object>(
+  partial: Partial<T>,
+  schema: Schema,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const key of Object.keys(partial)) {
+    const v = (partial as Record<string, unknown>)[key]
+    if (v === undefined) continue
+    if (key in schema) {
+      out[key] = wrapValue(v, schema[key]!)
+    } else {
+      out[key] = v
+    }
+  }
+  return out
+}
+
+export const ibkrPartialOrderToWire = (changes: Partial<Order>): Partial<WireOrder> =>
+  partialToWire(changes, ORDER_SCHEMA) as Partial<WireOrder>

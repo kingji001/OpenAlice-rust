@@ -1,6 +1,7 @@
 import Decimal from 'decimal.js'
 import { describe, expect, it } from 'vitest'
-import { Contract, ContractDetails, Execution, Order, OrderState } from '@traderalice/ibkr'
+import { Contract, ContractDetails, Execution, Order, OrderState, UNSET_DECIMAL } from '@traderalice/ibkr'
+import { ibkrPartialOrderToWire } from '../wire-adapters.js'
 import {
   CONTRACT_DETAILS_SCHEMA,
   CONTRACT_SCHEMA,
@@ -88,5 +89,48 @@ describe('schema consistency — every schema entry maps to a real field', () =>
     for (const key of Object.keys(CONTRACT_DETAILS_SCHEMA)) {
       expect(key in instance, `CONTRACT_DETAILS_SCHEMA.${key} is not a field on ContractDetails`).toBe(true)
     }
+  })
+})
+
+describe('partialToWire / ibkrPartialOrderToWire', () => {
+  it('empty input produces empty output', () => {
+    expect(ibkrPartialOrderToWire({})).toEqual({})
+  })
+
+  it('single Decimal field wraps as { kind: "value", value: canonical }', () => {
+    const result = ibkrPartialOrderToWire({ lmtPrice: new Decimal('150.50') })
+    expect(result).toEqual({
+      lmtPrice: { kind: 'value', value: '150.5' },
+    })
+  })
+
+  it('UNSET_DECIMAL on a partial wraps as { kind: "unset" }', () => {
+    const result = ibkrPartialOrderToWire({ lmtPrice: UNSET_DECIMAL })
+    expect(result).toEqual({
+      lmtPrice: { kind: 'unset' },
+    })
+  })
+
+  it('non-schema (string) field passes through verbatim', () => {
+    const result = ibkrPartialOrderToWire({ action: 'BUY' as const })
+    expect(result).toEqual({ action: 'BUY' })
+  })
+
+  it('undefined field is omitted entirely', () => {
+    const result = ibkrPartialOrderToWire({ lmtPrice: undefined })
+    expect(result).toEqual({})
+  })
+
+  it('multiple fields combined', () => {
+    const result = ibkrPartialOrderToWire({
+      lmtPrice: new Decimal('100'),
+      action: 'SELL' as const,
+      tif: 'DAY',
+    })
+    expect(result).toEqual({
+      lmtPrice: { kind: 'value', value: '100' },
+      action: 'SELL',
+      tif: 'DAY',
+    })
   })
 })
