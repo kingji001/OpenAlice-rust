@@ -115,18 +115,6 @@ export const ORDER_SCHEMA = {
 export const CONTRACT_SCHEMA = {
   conId: 'WireInteger',
   strike: 'WireDouble',
-  minTick: 'WireDouble',
-  priceMagnifier: 'WireInteger',
-  underConId: 'WireInteger',
-  evMultiplier: 'WireDouble',
-  aggGroup: 'WireInteger',
-  coupon: 'WireDouble',
-  minSize: 'WireDecimal',
-  sizeIncrement: 'WireDecimal',
-  suggestedSizeIncrement: 'WireDecimal',
-  minAlgoSize: 'WireDecimal',
-  lastPricePrecision: 'WireDecimal',
-  lastSizePrecision: 'WireDecimal',
 } as const satisfies Record<string, 'WireDecimal' | 'WireDouble' | 'WireInteger'>
 
 export const EXECUTION_SCHEMA = {
