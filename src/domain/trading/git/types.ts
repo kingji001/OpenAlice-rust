@@ -60,14 +60,31 @@ export interface GitState {
 // ==================== Commit ====================
 
 export interface GitCommit {
+  /** 8-char display hash. For v2 commits, this is intentFullHash.slice(0, 8). */
   hash: CommitHash
   parentHash: CommitHash | null
   message: string
   operations: Operation[]
   results: OperationResult[]
   stateAfter: GitState
+  /** Wall-clock timestamp of commit creation. For v2 commits, equals hashInputTimestamp. */
   timestamp: string
   round?: number
+
+  // Phase 2 — populated for v2 commits only
+  /** Absent or 1 = legacy v1 opaque hash. 2 = canonical v2 intent hash. */
+  hashVersion?: 1 | 2
+  /** 64-char SHA-256 over the canonical v2 input. Present iff hashVersion === 2. */
+  intentFullHash?: string
+  /** Exact timestamp fed into the v2 hash input. Present iff hashVersion === 2.
+   *  For v2 commits, this is also the value persisted as `timestamp` above. */
+  hashInputTimestamp?: string
+
+  // Phase 2.5 reservation — NOT populated in Phase 2
+  /** Reserved for Phase 2.5. Do not populate in Phase 2. */
+  entryHashVersion?: 1
+  /** Reserved for Phase 2.5. Do not populate in Phase 2. */
+  entryFullHash?: string
 }
 
 // ==================== API Results ====================
