@@ -39,6 +39,7 @@ function makeConfig(overrides: Partial<TradingGitConfig> = {}): TradingGitConfig
     }),
     getGitState: overrides.getGitState ?? vi.fn().mockResolvedValue(makeGitState()),
     onCommit: overrides.onCommit,
+    hashVersion: overrides.hashVersion,
   }
 }
 
@@ -733,5 +734,62 @@ describe('TradingGit', () => {
       expect(result.success).toBe(false)
       expect(result.error).toContain('Invalid change format')
     })
+  })
+})
+
+describe('TradingGit v2 hashing (Phase 2)', () => {
+  it('default config produces v2 commits', async () => {
+    const config = makeConfig()
+    const git = new TradingGit(config)
+    git.add(buyOp())
+    git.commit('test')
+    await git.push()
+    const log = git.log()
+    expect(log[0].hash).toHaveLength(8)
+    const commit = git.show(log[0].hash)!
+    expect(commit.hashVersion).toBe(2)
+    expect(commit.intentFullHash).toMatch(/^[0-9a-f]{64}$/)
+    expect(commit.hashInputTimestamp).toBeDefined()
+    expect(commit.timestamp).toBe(commit.hashInputTimestamp)
+  })
+
+  it('hashVersion: 1 config produces v1-style commits (no v2 fields)', async () => {
+    const config = makeConfig({ hashVersion: 1 })
+    const git = new TradingGit(config)
+    git.add(buyOp())
+    git.commit('test')
+    await git.push()
+    const log = git.log()
+    const commit = git.show(log[0].hash)!
+    expect(commit.hashVersion).toBeUndefined()
+    expect(commit.intentFullHash).toBeUndefined()
+    expect(commit.hashInputTimestamp).toBeUndefined()
+  })
+
+  it('v2 timestamp equals hashInputTimestamp across commit→push', async () => {
+    const config = makeConfig()
+    const git = new TradingGit(config)
+    git.add(buyOp())
+    const commitResult = git.commit('test')
+    await new Promise((r) => setTimeout(r, 10))
+    await git.push()
+    const commit = git.show(commitResult.hash)!
+    expect(commit.timestamp).toBe(commit.hashInputTimestamp)
+  })
+
+  it('pendingV2 cleared after push (next commit gets fresh timestamp)', async () => {
+    const config = makeConfig()
+    const git = new TradingGit(config)
+    git.add(buyOp())
+    git.commit('first')
+    await git.push()
+    await new Promise((r) => setTimeout(r, 10))
+    git.add(buyOp('MSFT'))
+    git.commit('second')
+    await git.push()
+    const log = git.log()
+    const first = git.show(log[1].hash)!
+    const second = git.show(log[0].hash)!
+    expect(first.hashInputTimestamp).not.toBe(second.hashInputTimestamp)
   })
 })

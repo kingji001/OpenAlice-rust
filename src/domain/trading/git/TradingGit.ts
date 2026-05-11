@@ -8,6 +8,7 @@ import { createHash } from 'crypto'
 import Decimal from 'decimal.js'
 import { Order, UNSET_DECIMAL } from '@traderalice/ibkr'
 import { rehydrateCommit } from './_rehydrate.js'
+import { generateIntentHashV2 } from './hash-v2.js'
 import type { ITradingGit, TradingGitConfig } from './interfaces.js'
 import type {
   CommitHash,
@@ -31,7 +32,7 @@ import type {
 } from './types.js'
 import { getOperationSymbol } from './types.js'
 
-function generateCommitHash(content: object): CommitHash {
+function generateCommitHashV1(content: object): CommitHash {
   const hash = createHash('sha256')
     .update(JSON.stringify(content))
     .digest('hex')
@@ -42,6 +43,7 @@ export class TradingGit implements ITradingGit {
   private stagingArea: Operation[] = []
   private pendingMessage: string | null = null
   private pendingHash: CommitHash | null = null
+  private pendingV2: { hashInputTimestamp: string; intentFullHash: string } | null = null
   private commits: GitCommit[] = []
   private head: CommitHash | null = null
   private currentRound: number | undefined = undefined
@@ -67,18 +69,37 @@ export class TradingGit implements ITradingGit {
       throw new Error('Nothing to commit: staging area is empty')
     }
 
-    const timestamp = new Date().toISOString()
-    this.pendingHash = generateCommitHash({
-      message,
-      operations: this.stagingArea,
-      timestamp,
-      parentHash: this.head,
-    })
+    const hashInputTimestamp = new Date().toISOString()
+    const hashVersion = this.config.hashVersion ?? 2
+
+    let pendingHash: CommitHash
+    let pendingV2: { hashInputTimestamp: string; intentFullHash: string } | null = null
+
+    if (hashVersion === 2) {
+      const { intentFullHash, shortHash } = generateIntentHashV2({
+        parentHash: this.head,
+        message,
+        operations: this.stagingArea,
+        hashInputTimestamp,
+      })
+      pendingHash = shortHash
+      pendingV2 = { hashInputTimestamp, intentFullHash }
+    } else {
+      pendingHash = generateCommitHashV1({
+        message,
+        operations: this.stagingArea,
+        timestamp: hashInputTimestamp,
+        parentHash: this.head,
+      })
+    }
+
+    this.pendingHash = pendingHash
     this.pendingMessage = message
+    this.pendingV2 = pendingV2
 
     return {
       prepared: true,
-      hash: this.pendingHash,
+      hash: pendingHash,
       message,
       operationCount: this.stagingArea.length,
     }
@@ -122,8 +143,15 @@ export class TradingGit implements ITradingGit {
       operations,
       results,
       stateAfter,
-      timestamp: new Date().toISOString(),
+      timestamp: this.pendingV2?.hashInputTimestamp ?? new Date().toISOString(),
       round: this.currentRound,
+      ...(this.pendingV2 !== null
+        ? {
+            hashVersion: 2 as const,
+            intentFullHash: this.pendingV2.intentFullHash,
+            hashInputTimestamp: this.pendingV2.hashInputTimestamp,
+          }
+        : {}),
     }
 
     this.commits.push(commit)
@@ -135,6 +163,7 @@ export class TradingGit implements ITradingGit {
     this.stagingArea = []
     this.pendingMessage = null
     this.pendingHash = null
+    this.pendingV2 = null
 
     const rejected = results.filter((r) => !r.success)
     const submitted = results.filter((r) => r.success)
@@ -170,8 +199,15 @@ export class TradingGit implements ITradingGit {
       operations,
       results,
       stateAfter,
-      timestamp: new Date().toISOString(),
+      timestamp: this.pendingV2?.hashInputTimestamp ?? new Date().toISOString(),
       round: this.currentRound,
+      ...(this.pendingV2 !== null
+        ? {
+            hashVersion: 2 as const,
+            intentFullHash: this.pendingV2.intentFullHash,
+            hashInputTimestamp: this.pendingV2.hashInputTimestamp,
+          }
+        : {}),
     }
 
     this.commits.push(commit)
@@ -182,6 +218,7 @@ export class TradingGit implements ITradingGit {
     this.stagingArea = []
     this.pendingMessage = null
     this.pendingHash = null
+    this.pendingV2 = null
 
     return { hash, message, operationCount: operations.length }
   }
@@ -320,28 +357,49 @@ export class TradingGit implements ITradingGit {
       return { hash: this.head ?? '', updatedCount: 0, updates: [] }
     }
 
-    const hash = generateCommitHash({
-      updates,
-      timestamp: new Date().toISOString(),
-      parentHash: this.head,
-    })
+    const hashInputTimestamp = new Date().toISOString()
+    const message = `[sync] ${updates.length} order(s) updated`
+    const operations: Operation[] = [{ action: 'syncOrders' as const }]
+    const results: OperationResult[] = updates.map((u) => ({
+      action: 'syncOrders' as const,
+      success: true,
+      orderId: u.orderId,
+      status: u.currentStatus,
+      filledQty: u.filledQty,
+      filledPrice: u.filledPrice,
+    }))
+
+    const hashVersion = this.config.hashVersion ?? 2
+    let hash: CommitHash
+    let v2Fields: { hashVersion: 2; intentFullHash: string; hashInputTimestamp: string } | undefined
+
+    if (hashVersion === 2) {
+      const { intentFullHash, shortHash } = generateIntentHashV2({
+        parentHash: this.head,
+        message,
+        operations,
+        hashInputTimestamp,
+      })
+      hash = shortHash
+      v2Fields = { hashVersion: 2, intentFullHash, hashInputTimestamp }
+    } else {
+      hash = generateCommitHashV1({
+        updates,
+        timestamp: hashInputTimestamp,
+        parentHash: this.head,
+      })
+    }
 
     const commit: GitCommit = {
       hash,
       parentHash: this.head,
-      message: `[sync] ${updates.length} order(s) updated`,
-      operations: [{ action: 'syncOrders' as const }],
-      results: updates.map((u) => ({
-        action: 'syncOrders' as const,
-        success: true,
-        orderId: u.orderId,
-        status: u.currentStatus,
-        filledQty: u.filledQty,
-        filledPrice: u.filledPrice,
-      })),
+      message,
+      operations,
+      results,
       stateAfter: currentState,
-      timestamp: new Date().toISOString(),
+      timestamp: hashInputTimestamp,
       round: this.currentRound,
+      ...(v2Fields ?? {}),
     }
 
     this.commits.push(commit)

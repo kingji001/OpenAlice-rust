@@ -56,4 +56,8 @@ export interface TradingGitConfig {
   executeOperation: (operation: Operation) => Promise<unknown>
   getGitState: () => Promise<GitState>
   onCommit?: (state: GitExportState) => void | Promise<void>
+  /** Hash version for new commits. Defaults to 2 (canonical intent hash).
+   *  Set to 1 to fall back to legacy opaque hashing — byte-identical to
+   *  pre-Phase-2 behavior. v1 commits always load regardless. */
+  hashVersion?: 1 | 2
 }
