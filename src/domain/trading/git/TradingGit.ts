@@ -7,6 +7,7 @@
 import { createHash } from 'crypto'
 import Decimal from 'decimal.js'
 import { Order, UNSET_DECIMAL } from '@traderalice/ibkr'
+import { rehydrateCommit } from './_rehydrate.js'
 import type { ITradingGit, TradingGitConfig } from './interfaces.js'
 import type {
   CommitHash,
@@ -303,71 +304,9 @@ export class TradingGit implements ITradingGit {
 
   static restore(state: GitExportState, config: TradingGitConfig): TradingGit {
     const git = new TradingGit(config)
-    git.commits = state.commits.map(TradingGit.rehydrateCommit)
+    git.commits = state.commits.map(rehydrateCommit)
     git.head = state.head
     return git
-  }
-
-  /** Rehydrate Decimal fields lost during JSON round-trip. */
-  private static rehydrateCommit(commit: GitCommit): GitCommit {
-    return {
-      ...commit,
-      operations: commit.operations.map(TradingGit.rehydrateOperation),
-      stateAfter: TradingGit.rehydrateGitState(commit.stateAfter),
-    }
-  }
-
-  private static rehydrateOperation(op: Operation): Operation {
-    switch (op.action) {
-      case 'placeOrder':
-        return {
-          ...op,
-          order: op.order ? TradingGit.rehydrateOrder(op.order) : op.order,
-        }
-      case 'closePosition':
-        return {
-          ...op,
-          quantity: op.quantity != null ? new Decimal(String(op.quantity)) : op.quantity,
-        }
-      default:
-        return op
-    }
-  }
-
-  private static rehydrateOrder(order: Order): Order {
-    const rehydrated = Object.assign(new Order(), order)
-    // Decimal fields need re-wrapping after JSON.parse — strings or numbers
-    // become plain JS values, not Decimal instances. `new Decimal(String(x))`
-    // accepts both legacy (number) and current (string) persisted forms.
-    if (order.totalQuantity != null) {
-      rehydrated.totalQuantity = new Decimal(String(order.totalQuantity))
-    }
-    if (order.lmtPrice != null) {
-      rehydrated.lmtPrice = new Decimal(String(order.lmtPrice))
-    }
-    if (order.auxPrice != null) {
-      rehydrated.auxPrice = new Decimal(String(order.auxPrice))
-    }
-    if (order.trailStopPrice != null) {
-      rehydrated.trailStopPrice = new Decimal(String(order.trailStopPrice))
-    }
-    if (order.trailingPercent != null) {
-      rehydrated.trailingPercent = new Decimal(String(order.trailingPercent))
-    }
-    if (order.cashQty != null) {
-      rehydrated.cashQty = new Decimal(String(order.cashQty))
-    }
-    return rehydrated
-  }
-
-  private static rehydrateGitState(state: GitState): GitState {
-    return {
-      ...state,
-      positions: state.positions.map((pos) => ({
-        ...pos,
-        quantity: new Decimal(String(pos.quantity)),
-      })),
-    }
   }
 
   setCurrentRound(round: number): void {
