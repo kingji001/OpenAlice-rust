@@ -1,7 +1,8 @@
 import Decimal from 'decimal.js'
 import { describe, expect, it } from 'vitest'
-import { Contract, Execution, Order, OrderState } from '@traderalice/ibkr'
+import { Contract, ContractDetails, Execution, Order, OrderState } from '@traderalice/ibkr'
 import {
+  CONTRACT_DETAILS_SCHEMA,
   CONTRACT_SCHEMA,
   EXECUTION_SCHEMA,
   ORDER_SCHEMA,
@@ -44,6 +45,13 @@ describe('schema consistency — every numeric field has a schema entry', () => 
       expect(f in ORDER_STATE_SCHEMA, `OrderState.${f} is numeric but not in ORDER_STATE_SCHEMA`).toBe(true)
     }
   })
+
+  it('ContractDetails', () => {
+    const fields = numericFieldsOf(new ContractDetails())
+    for (const f of fields) {
+      expect(f in CONTRACT_DETAILS_SCHEMA, `ContractDetails.${f} is numeric but not in CONTRACT_DETAILS_SCHEMA`).toBe(true)
+    }
+  })
 })
 
 describe('schema consistency — every schema entry maps to a real field', () => {
@@ -72,6 +80,13 @@ describe('schema consistency — every schema entry maps to a real field', () =>
     const instance = new OrderState()
     for (const key of Object.keys(ORDER_STATE_SCHEMA)) {
       expect(key in instance, `ORDER_STATE_SCHEMA.${key} is not a field on OrderState`).toBe(true)
+    }
+  })
+
+  it('ContractDetails', () => {
+    const instance = new ContractDetails()
+    for (const key of Object.keys(CONTRACT_DETAILS_SCHEMA)) {
+      expect(key in instance, `CONTRACT_DETAILS_SCHEMA.${key} is not a field on ContractDetails`).toBe(true)
     }
   })
 })

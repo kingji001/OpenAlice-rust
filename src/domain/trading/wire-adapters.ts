@@ -19,6 +19,7 @@
 import Decimal from 'decimal.js'
 import {
   Contract,
+  ContractDetails,
   Execution,
   Order,
   OrderState,
@@ -28,11 +29,13 @@ import {
 } from '@traderalice/ibkr'
 import { toCanonicalDecimalString } from './wire-canonical-decimal.js'
 import {
+  CONTRACT_DETAILS_SCHEMA,
   CONTRACT_SCHEMA,
   EXECUTION_SCHEMA,
   ORDER_SCHEMA,
   ORDER_STATE_SCHEMA,
   type WireContract,
+  type WireContractDetails,
   type WireDecimal,
   type WireDouble,
   type WireExecution,
@@ -141,6 +144,8 @@ export const ibkrOrderToWire = (o: Order): WireOrder =>
   toWire(o, ORDER_SCHEMA) as unknown as WireOrder
 export const ibkrContractToWire = (c: Contract): WireContract =>
   toWire(c, CONTRACT_SCHEMA) as unknown as WireContract
+export const ibkrContractDetailsToWire = (d: ContractDetails): WireContractDetails =>
+  toWire(d, CONTRACT_DETAILS_SCHEMA) as unknown as WireContractDetails
 export const ibkrExecutionToWire = (e: Execution): WireExecution =>
   toWire(e, EXECUTION_SCHEMA) as unknown as WireExecution
 export const ibkrOrderStateToWire = (s: OrderState): WireOrderState =>
@@ -150,6 +155,8 @@ export const wireToIbkrOrder = (w: WireOrder): Order =>
   fromWire(w as unknown as Record<string, unknown>, ORDER_SCHEMA, Order)
 export const wireToIbkrContract = (w: WireContract): Contract =>
   fromWire(w as unknown as Record<string, unknown>, CONTRACT_SCHEMA, Contract)
+export const wireToIbkrContractDetails = (w: WireContractDetails): ContractDetails =>
+  fromWire(w as unknown as Record<string, unknown>, CONTRACT_DETAILS_SCHEMA, ContractDetails)
 export const wireToIbkrExecution = (w: WireExecution): Execution =>
   fromWire(w as unknown as Record<string, unknown>, EXECUTION_SCHEMA, Execution)
 export const wireToIbkrOrderState = (w: WireOrderState): OrderState =>

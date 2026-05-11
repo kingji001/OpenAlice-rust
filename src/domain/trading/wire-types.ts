@@ -32,7 +32,7 @@ export type WireInteger =
   | { kind: 'unset' }
   | { kind: 'value'; value: number }
 
-import type { Order, Contract, Execution, OrderState } from '@traderalice/ibkr'
+import type { Order, Contract, ContractDetails, Execution, OrderState } from '@traderalice/ibkr'
 
 /**
  * Per-class schemas — hand-transcribed from parity/decimal-inventory.md.
@@ -117,6 +117,21 @@ export const CONTRACT_SCHEMA = {
   strike: 'WireDouble',
 } as const satisfies Record<string, 'WireDecimal' | 'WireDouble' | 'WireInteger'>
 
+export const CONTRACT_DETAILS_SCHEMA = {
+  minTick: 'WireDouble',
+  priceMagnifier: 'WireInteger',
+  underConId: 'WireInteger',
+  evMultiplier: 'WireDouble',
+  aggGroup: 'WireInteger',
+  coupon: 'WireDouble',
+  minSize: 'WireDecimal',
+  sizeIncrement: 'WireDecimal',
+  suggestedSizeIncrement: 'WireDecimal',
+  minAlgoSize: 'WireDecimal',
+  lastPricePrecision: 'WireDecimal',
+  lastSizePrecision: 'WireDecimal',
+} as const satisfies Record<string, 'WireDecimal' | 'WireDouble' | 'WireInteger'>
+
 export const EXECUTION_SCHEMA = {
   shares: 'WireDecimal',
   price: 'WireDouble',
@@ -170,5 +185,6 @@ type MakeWire<Schema extends Record<string, keyof WireMap>, Source> = {
 
 export type WireOrder = MakeWire<typeof ORDER_SCHEMA, Order>
 export type WireContract = MakeWire<typeof CONTRACT_SCHEMA, Contract>
+export type WireContractDetails = MakeWire<typeof CONTRACT_DETAILS_SCHEMA, ContractDetails>
 export type WireExecution = MakeWire<typeof EXECUTION_SCHEMA, Execution>
 export type WireOrderState = MakeWire<typeof ORDER_STATE_SCHEMA, OrderState>
