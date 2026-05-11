@@ -430,10 +430,10 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     },
     {
-      "hash": "7c23255d",
+      "hash": "ecbc617d",
       "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
       "hashVersion": 2,
-      "intentFullHash": "7c23255da636bafc2b8804295217e7d6affa5c2cb69d6debfac3bcd772432410",
+      "intentFullHash": "ecbc617d92f4fa11549ab05b3b88ef6f57de1b3f6d03c33ad0d569e5f8e2e871",
       "message": "Chain step 1: buy MKT default",
       "operations": [
         {
@@ -648,10 +648,10 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     },
     {
-      "hash": "abf8fa45",
+      "hash": "1a77c9fc",
       "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
       "hashVersion": 2,
-      "intentFullHash": "abf8fa45dadab19ce69c07263b92d71b90d47ff3d15d10c91f95f8e77f667ec4",
+      "intentFullHash": "1a77c9fce13a2278e6c4ed4a48e4cc0bed941a834186fa32e664e9d48258663a",
       "message": "Chain step 2: buy MKT 8-decimal qty",
       "operations": [
         {
@@ -838,7 +838,7 @@
           }
         }
       ],
-      "parentHash": "7c23255d",
+      "parentHash": "ecbc617d",
       "results": [
         {
           "action": "placeOrder",
@@ -866,5 +866,5 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     }
   ],
-  "head": "abf8fa45"
+  "head": "1a77c9fc"
 }
