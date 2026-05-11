@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import Decimal from 'decimal.js'
-import { toCanonicalDecimalString, CanonicalDecimalError } from './_canonical-decimal.js'
+import { toCanonicalDecimalString, CanonicalDecimalError } from '../canonical-decimal.js'
 
 describe('toCanonicalDecimalString', () => {
   it.each([

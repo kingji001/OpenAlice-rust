@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { canonicalJson } from './_canonical-json.js'
+import { canonicalJson, CanonicalJsonValue } from '../canonical-json.js'
 
 describe('canonicalJson', () => {
   it('sorts object keys alphabetically', () => {
@@ -32,7 +32,7 @@ describe('canonicalJson', () => {
   })
 
   it('round-trips: parse(canonical(x)) deep-equals x', () => {
-    const x = { z: [{ b: 2, a: 1 }, { d: 4, c: 3 }], a: 'first' }
+    const x = { z: [{ b: 2, a: 1 }, { d: 4, c: 3 }], a: 'first' } as CanonicalJsonValue
     expect(JSON.parse(canonicalJson(x))).toEqual(x)
   })
 })
