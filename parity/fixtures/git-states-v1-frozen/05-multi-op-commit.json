@@ -1,10 +1,7 @@
 {
   "commits": [
     {
-      "hash": "754205df",
-      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
-      "hashVersion": 2,
-      "intentFullHash": "754205dfd98cbc699134bd28bdbe2b144e6d0cd616f1eadf10ce79e8e51f1fe4",
+      "hash": "8c3685f9",
       "message": "Multi-op batch: 5 orders in one commit",
       "operations": [
         {
@@ -1007,5 +1004,5 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     }
   ],
-  "head": "754205df"
+  "head": "8c3685f9"
 }

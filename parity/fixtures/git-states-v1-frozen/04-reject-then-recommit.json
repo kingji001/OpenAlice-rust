@@ -1,10 +1,7 @@
 {
   "commits": [
     {
-      "hash": "923be12d",
-      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
-      "hashVersion": 2,
-      "intentFullHash": "923be12d16b28187254dd5a89a5ad8dcebc32f9797fc4ee00c776f032a080378",
+      "hash": "033a49ed",
       "message": "[rejected] Buy order (to be user-rejected) — Changed mind — market conditions unfavorable",
       "operations": [
         {
@@ -211,10 +208,7 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     },
     {
-      "hash": "d9622a0e",
-      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
-      "hashVersion": 2,
-      "intentFullHash": "d9622a0e98c96b89c14298c5271ecae0dd87718615965d508994a555492e4f61",
+      "hash": "50f9a861",
       "message": "Limit buy at safer price",
       "operations": [
         {
@@ -401,7 +395,7 @@
           }
         }
       ],
-      "parentHash": "923be12d",
+      "parentHash": "033a49ed",
       "results": [
         {
           "action": "placeOrder",
@@ -429,5 +423,5 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     }
   ],
-  "head": "d9622a0e"
+  "head": "50f9a861"
 }

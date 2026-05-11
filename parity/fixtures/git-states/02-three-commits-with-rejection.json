@@ -1,7 +1,10 @@
 {
   "commits": [
     {
-      "hash": "47d733a4",
+      "hash": "1b47305d",
+      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
+      "hashVersion": 2,
+      "intentFullHash": "1b47305d70857c32daaabbddbea82dbf1e5aee36cc894d6e2ff98ba6bb30dce2",
       "message": "First buy",
       "operations": [
         {
@@ -216,7 +219,10 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     },
     {
-      "hash": "a8e6140d",
+      "hash": "7e91be39",
+      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
+      "hashVersion": 2,
+      "intentFullHash": "7e91be39bd88e48e5343a8bf49fe69040d33006278e176ab12ced248d24d0db4",
       "message": "Sell attempt (will be rejected)",
       "operations": [
         {
@@ -403,7 +409,7 @@
           }
         }
       ],
-      "parentHash": "47d733a4",
+      "parentHash": "1b47305d",
       "results": [
         {
           "action": "placeOrder",
@@ -430,7 +436,10 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     },
     {
-      "hash": "d3dd57f3",
+      "hash": "e9d1d215",
+      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
+      "hashVersion": 2,
+      "intentFullHash": "e9d1d215751afa40b112a822fbd4092cfd86a5e4f76cb7fd95f9ff3daa87cb5e",
       "message": "Limit buy after failed sell",
       "operations": [
         {
@@ -617,7 +626,7 @@
           }
         }
       ],
-      "parentHash": "a8e6140d",
+      "parentHash": "7e91be39",
       "results": [
         {
           "action": "placeOrder",
@@ -645,5 +654,5 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     }
   ],
-  "head": "d3dd57f3"
+  "head": "e9d1d215"
 }

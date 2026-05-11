@@ -61,6 +61,10 @@ export function rehydrateOrder(order: Order): Order {
   if (order.cashQty != null) {
     rehydrated.cashQty = new Decimal(String(order.cashQty))
   }
+  // filledQuantity is also a WireDecimal field; JSON round-trip loses the Decimal wrapper.
+  if ((order as any).filledQuantity != null) {
+    ;(rehydrated as any).filledQuantity = new Decimal(String((order as any).filledQuantity))
+  }
   return rehydrated
 }
 

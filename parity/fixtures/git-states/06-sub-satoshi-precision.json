@@ -1,7 +1,10 @@
 {
   "commits": [
     {
-      "hash": "8bcad54c",
+      "hash": "21892712",
+      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
+      "hashVersion": 2,
+      "intentFullHash": "2189271226e7711ebfbdb75de680eb4391321fd5281cec888a2110fe27e2b278",
       "message": "Sub-satoshi quantity buy",
       "operations": [
         {
@@ -216,5 +219,5 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     }
   ],
-  "head": "8bcad54c"
+  "head": "21892712"
 }

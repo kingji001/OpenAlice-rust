@@ -1,10 +1,7 @@
 {
   "commits": [
     {
-      "hash": "7c23255d",
-      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
-      "hashVersion": 2,
-      "intentFullHash": "7c23255da636bafc2b8804295217e7d6affa5c2cb69d6debfac3bcd772432410",
+      "hash": "8ccddb8a",
       "message": "Chain step 1: buy MKT default",
       "operations": [
         {
@@ -219,10 +216,7 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     },
     {
-      "hash": "abf8fa45",
-      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
-      "hashVersion": 2,
-      "intentFullHash": "abf8fa45dadab19ce69c07263b92d71b90d47ff3d15d10c91f95f8e77f667ec4",
+      "hash": "e1d28b84",
       "message": "Chain step 2: buy MKT 8-decimal qty",
       "operations": [
         {
@@ -409,7 +403,7 @@
           }
         }
       ],
-      "parentHash": "7c23255d",
+      "parentHash": "8ccddb8a",
       "results": [
         {
           "action": "placeOrder",
@@ -437,10 +431,7 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     },
     {
-      "hash": "5d82ec71",
-      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
-      "hashVersion": 2,
-      "intentFullHash": "5d82ec712d6b28bf6e54c8904b297e02804bcbd5410d92110bb3e146727ecc49",
+      "hash": "920f8c49",
       "message": "Chain step 3: buy MKT 12-decimal qty",
       "operations": [
         {
@@ -627,7 +618,7 @@
           }
         }
       ],
-      "parentHash": "abf8fa45",
+      "parentHash": "e1d28b84",
       "results": [
         {
           "action": "placeOrder",
@@ -655,10 +646,7 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     },
     {
-      "hash": "99009c82",
-      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
-      "hashVersion": 2,
-      "intentFullHash": "99009c82fe90a52b67a82355e892718aefbedba72294ae13a381c16a05a25c0c",
+      "hash": "bb4e783f",
       "message": "Chain step 4: buy MKT 18-decimal qty",
       "operations": [
         {
@@ -845,7 +833,7 @@
           }
         }
       ],
-      "parentHash": "5d82ec71",
+      "parentHash": "920f8c49",
       "results": [
         {
           "action": "placeOrder",
@@ -873,10 +861,7 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     },
     {
-      "hash": "b5c5098c",
-      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
-      "hashVersion": 2,
-      "intentFullHash": "b5c5098cb994e3a1ea29a4dfe46aee598589afa48415f735b5ea9ca872a1923e",
+      "hash": "2ffa314f",
       "message": "Chain step 5: buy MKT 1e30 qty",
       "operations": [
         {
@@ -1063,7 +1048,7 @@
           }
         }
       ],
-      "parentHash": "99009c82",
+      "parentHash": "bb4e783f",
       "results": [
         {
           "action": "placeOrder",
@@ -1091,10 +1076,7 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     },
     {
-      "hash": "8a5598eb",
-      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
-      "hashVersion": 2,
-      "intentFullHash": "8a5598eb306f0bbf6a97a1e3c3866210998a1602b869e58bcbb16654c928b897",
+      "hash": "04ec5bac",
       "message": "Chain step 6: sell MKT default",
       "operations": [
         {
@@ -1281,7 +1263,7 @@
           }
         }
       ],
-      "parentHash": "b5c5098c",
+      "parentHash": "2ffa314f",
       "results": [
         {
           "action": "placeOrder",
@@ -1309,10 +1291,7 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     },
     {
-      "hash": "708686ea",
-      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
-      "hashVersion": 2,
-      "intentFullHash": "708686ea61898f4e1464ccd7c7cb804eff079f993c86903fd44cb0a107102d2f",
+      "hash": "cc1224aa",
       "message": "Chain step 7: sell MKT 8-decimal qty",
       "operations": [
         {
@@ -1499,7 +1478,7 @@
           }
         }
       ],
-      "parentHash": "8a5598eb",
+      "parentHash": "04ec5bac",
       "results": [
         {
           "action": "placeOrder",
@@ -1527,10 +1506,7 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     },
     {
-      "hash": "0c8aeb44",
-      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
-      "hashVersion": 2,
-      "intentFullHash": "0c8aeb44341e4e6f8396c5033c1fe17f6780414f860cd751dcd367429bf08924",
+      "hash": "e84dcc33",
       "message": "Chain step 8: sell MKT 12-decimal qty",
       "operations": [
         {
@@ -1717,7 +1693,7 @@
           }
         }
       ],
-      "parentHash": "708686ea",
+      "parentHash": "cc1224aa",
       "results": [
         {
           "action": "placeOrder",
@@ -1745,10 +1721,7 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     },
     {
-      "hash": "2a05cd62",
-      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
-      "hashVersion": 2,
-      "intentFullHash": "2a05cd62403c516b52ca9d283d0234065aee6478381b83f45a319fa88eec63fb",
+      "hash": "fa78bdc8",
       "message": "Chain step 9: sell MKT 18-decimal qty",
       "operations": [
         {
@@ -1935,7 +1908,7 @@
           }
         }
       ],
-      "parentHash": "0c8aeb44",
+      "parentHash": "e84dcc33",
       "results": [
         {
           "action": "placeOrder",
@@ -1963,10 +1936,7 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     },
     {
-      "hash": "2c10fe21",
-      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
-      "hashVersion": 2,
-      "intentFullHash": "2c10fe21ae87915450b5f7929ef8893b30a8073ed39d750439b2cbe96509b21c",
+      "hash": "d99f44b1",
       "message": "Chain step 10: buy LMT default",
       "operations": [
         {
@@ -2153,7 +2123,7 @@
           }
         }
       ],
-      "parentHash": "2a05cd62",
+      "parentHash": "fa78bdc8",
       "results": [
         {
           "action": "placeOrder",
@@ -2181,5 +2151,5 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     }
   ],
-  "head": "2c10fe21"
+  "head": "d99f44b1"
 }

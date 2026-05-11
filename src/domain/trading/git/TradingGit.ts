@@ -181,7 +181,6 @@ export class TradingGit implements ITradingGit {
 
     const operations = [...this.stagingArea]
     const message = `[rejected] ${this.pendingMessage}${reason ? ` — ${reason}` : ''}`
-    const hash = this.pendingHash
 
     const results: OperationResult[] = operations.map((op) => ({
       action: op.action,
@@ -192,6 +191,27 @@ export class TradingGit implements ITradingGit {
 
     const stateAfter = await this.config.getGitState()
 
+    // For v2 commits: recompute the hash using the final [rejected] message so that
+    // verifyCommit can reconstruct the same hash. The pendingV2 hash (from commit())
+    // was computed with the original message and would not verify against the stored
+    // [rejected] message.
+    const hashVersion = this.config.hashVersion ?? 2
+    let hash: CommitHash
+    let v2Fields: { hashVersion: 2; intentFullHash: string; hashInputTimestamp: string } | undefined
+
+    if (hashVersion === 2 && this.pendingV2 !== null) {
+      const { intentFullHash, shortHash } = generateIntentHashV2({
+        parentHash: this.head,
+        message,
+        operations,
+        hashInputTimestamp: this.pendingV2.hashInputTimestamp,
+      })
+      hash = shortHash
+      v2Fields = { hashVersion: 2, intentFullHash, hashInputTimestamp: this.pendingV2.hashInputTimestamp }
+    } else {
+      hash = this.pendingHash
+    }
+
     const commit: GitCommit = {
       hash,
       parentHash: this.head,
@@ -201,13 +221,7 @@ export class TradingGit implements ITradingGit {
       stateAfter,
       timestamp: this.pendingV2?.hashInputTimestamp ?? new Date().toISOString(),
       round: this.currentRound,
-      ...(this.pendingV2 !== null
-        ? {
-            hashVersion: 2 as const,
-            intentFullHash: this.pendingV2.intentFullHash,
-            hashInputTimestamp: this.pendingV2.hashInputTimestamp,
-          }
-        : {}),
+      ...(v2Fields ?? {}),
     }
 
     this.commits.push(commit)

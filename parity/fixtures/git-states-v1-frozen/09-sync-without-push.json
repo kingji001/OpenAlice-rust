@@ -1,10 +1,7 @@
 {
   "commits": [
     {
-      "hash": "5067dc18",
-      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
-      "hashVersion": 2,
-      "intentFullHash": "5067dc18c2eae7e8b01f8e0a6c69f1b31423d39096cd45221fc3407891eea37d",
+      "hash": "9216c663",
       "message": "Sync orders (no prior push)",
       "operations": [
         {
@@ -35,5 +32,5 @@
       "timestamp": "2026-01-01T00:00:00.000Z"
     }
   ],
-  "head": "5067dc18"
+  "head": "9216c663"
 }

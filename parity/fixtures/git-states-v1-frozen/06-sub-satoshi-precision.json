@@ -1,11 +1,8 @@
 {
   "commits": [
     {
-      "hash": "48f9fd84",
-      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
-      "hashVersion": 2,
-      "intentFullHash": "48f9fd84f93db172622c255ee6272b8c28aa8b2e6eb21ef470940c75855fbaff",
-      "message": "Buy order",
+      "hash": "8bcad54c",
+      "message": "Sub-satoshi quantity buy",
       "operations": [
         {
           "action": "placeOrder",
@@ -177,7 +174,7 @@
             "submitter": "",
             "sweepToFill": false,
             "tif": "DAY",
-            "totalQuantity": "100",
+            "totalQuantity": "1e-9",
             "trailStopPrice": "1.70141183460469231731687303715884105727e+38",
             "trailingPercent": "1.70141183460469231731687303715884105727e+38",
             "transmit": true,
@@ -199,7 +196,7 @@
           "raw": {
             "action": "placeOrder",
             "filledPrice": "100",
-            "filledQty": "100",
+            "filledQty": "0.000000001",
             "orderId": "mock-1",
             "status": "filled",
             "success": true
@@ -217,41 +214,7 @@
         "unrealizedPnL": "0"
       },
       "timestamp": "2026-01-01T00:00:00.000Z"
-    },
-    {
-      "hash": "8fc3f04f",
-      "hashInputTimestamp": "2026-01-01T00:00:00.000Z",
-      "hashVersion": 2,
-      "intentFullHash": "8fc3f04fdf9185795d52841281b4c4cc65dbe113070f9e0b1d54584988edf618",
-      "message": "Sync orders after fill",
-      "operations": [
-        {
-          "action": "syncOrders"
-        }
-      ],
-      "parentHash": "48f9fd84",
-      "results": [
-        {
-          "action": "syncOrders",
-          "raw": {
-            "action": "syncOrders",
-            "status": "submitted",
-            "success": true
-          },
-          "status": "submitted",
-          "success": true
-        }
-      ],
-      "stateAfter": {
-        "netLiquidation": "100000",
-        "pendingOrders": [],
-        "positions": [],
-        "realizedPnL": "0",
-        "totalCashValue": "100000",
-        "unrealizedPnL": "0"
-      },
-      "timestamp": "2026-01-01T00:00:00.000Z"
     }
   ],
-  "head": "8fc3f04f"
+  "head": "8bcad54c"
 }
