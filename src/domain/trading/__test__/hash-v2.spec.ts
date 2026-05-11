@@ -105,4 +105,17 @@ describe('generateIntentHashV2', () => {
     })
     expect(result.intentFullHash).toMatch(/^[0-9a-f]{64}$/)
   })
+
+  it('golden bytes — pins canonical-JSON + SHA-256 output (regression guard)', () => {
+    // If this test fails, it means canonicalJson, toCanonicalDecimalString,
+    // or the hash input shape changed. Stored v2 hashes from before the change
+    // will no longer verify. Update with care.
+    const result = generateIntentHashV2({
+      parentHash: null,
+      message: 'golden test',
+      operations: [],
+      hashInputTimestamp: '2026-01-01T00:00:00.000Z',
+    })
+    expect(result.intentFullHash).toBe('2a98a2d0ae18fa1bd6a744d5281b641a38296018aad9f73d7df9b209be23c97d')
+  })
 })

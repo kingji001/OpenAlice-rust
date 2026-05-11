@@ -102,6 +102,17 @@ describe('operationToWire', () => {
     expect('orderCancel' in wire).toBe(false)
   })
 
+  it('placeOrder with stopLoss limitPrice preserves limitPrice in wire', () => {
+    const op: Operation = {
+      action: 'placeOrder',
+      order: buildOrder(),
+      contract: buildContract(),
+      tpsl: { stopLoss: { price: '140.0', limitPrice: '139.5' } },
+    }
+    const wire = operationToWire(op) as Record<string, unknown>
+    expect((wire.tpsl as Record<string, unknown>).stopLoss).toEqual({ price: '140.0', limitPrice: '139.5' })
+  })
+
   it('syncOrders produces minimal output', () => {
     const op: Operation = { action: 'syncOrders' }
     const wire = operationToWire(op) as Record<string, unknown>

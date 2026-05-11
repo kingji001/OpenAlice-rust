@@ -44,6 +44,7 @@ export function operationToWire(op: Operation): CanonicalJsonValue {
       return {
         action: 'cancelOrder',
         orderId: op.orderId,
+        // TODO: add ibkrOrderCancelToWire when OrderCancel gains numeric sentinel fields
         ...(op.orderCancel ? { orderCancel: op.orderCancel as unknown as CanonicalJsonValue } : {}),
       }
     case 'syncOrders':
