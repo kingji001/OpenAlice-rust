@@ -12,8 +12,8 @@
 import { mkdir, writeFile, rm, readFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { UNSET_DECIMAL, UNSET_DOUBLE, UNSET_INTEGER } from '@traderalice/ibkr'
-import { toCanonicalDecimalString } from './_canonical-decimal.js'
-import { canonicalJson, type CanonicalJsonValue } from './_canonical-json.js'
+import { toCanonicalDecimalString } from '../../src/domain/trading/canonical-decimal.js'
+import { canonicalJson, type CanonicalJsonValue } from '../../src/domain/trading/canonical-json.js'
 
 interface FieldSpec {
   name: string

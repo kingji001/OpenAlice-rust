@@ -27,7 +27,7 @@ import {
   UNSET_DOUBLE,
   UNSET_INTEGER,
 } from '@traderalice/ibkr'
-import { toCanonicalDecimalString } from './wire-canonical-decimal.js'
+import { toCanonicalDecimalString } from './canonical-decimal.js'
 import {
   CONTRACT_DETAILS_SCHEMA,
   CONTRACT_SCHEMA,

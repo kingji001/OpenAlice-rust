@@ -26,7 +26,7 @@ import { resolve, join } from 'node:path'
 import { createHash } from 'node:crypto'
 import Decimal from 'decimal.js'
 import { Order, Contract } from '@traderalice/ibkr'
-import { canonicalJson, type CanonicalJsonValue } from './generators/_canonical-json.js'
+import { canonicalJson, type CanonicalJsonValue } from '../src/domain/trading/canonical-json.js'
 import { buildTradingGit, ScriptedStubPolicy, DefaultStubPolicy } from './_construct.js'
 import type { Operation, OperationResult, GitState, GitExportState } from '../src/domain/trading/git/types.js'
 
