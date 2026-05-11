@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js'
 import { describe, expect, it } from 'vitest'
-import { Contract, ContractDetails, Execution, Order, OrderState, UNSET_DECIMAL } from '@traderalice/ibkr'
+import { Contract, ContractDetails, Execution, Order, OrderState, UNSET_DECIMAL, UNSET_DOUBLE, UNSET_INTEGER } from '@traderalice/ibkr'
 import { ibkrPartialOrderToWire } from '../wire-adapters.js'
 import {
   CONTRACT_DETAILS_SCHEMA,
@@ -132,5 +132,15 @@ describe('partialToWire / ibkrPartialOrderToWire', () => {
       action: 'SELL',
       tif: 'DAY',
     })
+  })
+
+  it('UNSET_DOUBLE on a WireDouble field wraps as { kind: "unset" }', () => {
+    const result = ibkrPartialOrderToWire({ percentOffset: UNSET_DOUBLE })
+    expect(result).toEqual({ percentOffset: { kind: 'unset' } })
+  })
+
+  it('UNSET_INTEGER on a WireInteger field wraps as { kind: "unset" }', () => {
+    const result = ibkrPartialOrderToWire({ orderId: UNSET_INTEGER })
+    expect(result).toEqual({ orderId: { kind: 'unset' } })
   })
 })
