@@ -23,6 +23,23 @@ pnpm test           # Unit tests
 
 `pnpm build` uses tsup which is lenient — `tsc --noEmit` catches strict type errors that tsup ignores.
 
+## Binance Cross Margin Focus
+
+As of 2026-05-13, OpenAlice pivots to **Binance Cross Margin Classic** as the
+sole real broker. See `docs/binance-pivot-plan.md` for the full rationale and
+task breakdown.
+
+**Broker landscape (post-pivot):**
+- `brokers/ccxt/` — CcxtBroker configured for Binance (`exchange: 'binance'`, `marginType: 'cross'`)
+- `brokers/mock/` — In-memory test broker (retained for test infrastructure)
+- All other broker directories (alpaca, ibkr, longbridge, others) were deleted in the pivot.
+
+The Rust core (`crates/alice-trading-core/`) is broker-agnostic and fully
+retained — TradingGit, guards, journal (now with Borrow/Repay/TransferFunding
+variants), UtaActor, and the napi proxy all continue unchanged.
+
+The only non-mock preset is `binance-cross-margin` in `src/domain/trading/brokers/preset-catalog.ts`.
+
 ## Subsystem guides
 
 Some parts of this codebase are structured in ways that aren't obvious from
@@ -77,15 +94,13 @@ src/
 │   └── agent-sdk/             # Claude backend (@anthropic-ai/claude-agent-sdk, supports OAuth + API key)
 ├── domain/
 │   ├── market-data/           # Structured data layer (typebb in-process + OpenBB API remote)
-│   ├── trading/               # Unified multi-account trading, guard pipeline, git-like commits
+│   ├── trading/               # Binance Cross Margin trading, guard pipeline, git-like commits
 │   │   ├── account-manager.ts # UTA lifecycle (init, reconnect, enable/disable) + registry
 │   │   ├── git-persistence.ts # Git state load/save
 │   │   └── brokers/
 │   │       ├── registry.ts    # Broker self-registration (configSchema + configFields + fromConfig)
-│   │       ├── alpaca/        # Alpaca (US equities)
-│   │       ├── ccxt/          # CCXT (100+ crypto exchanges)
-│   │       ├── ibkr/          # Interactive Brokers (TWS/Gateway)
-│   │       └── mock/          # In-memory test broker
+│   │       ├── ccxt/          # CcxtBroker — Binance Cross Margin (marginType: 'cross')
+│   │       └── mock/          # In-memory test broker (retained for test infrastructure)
 │   ├── analysis/              # Indicators, technical analysis, sandbox
 │   ├── news/                  # RSS collector + archive search
 │   ├── brain/                 # Cognitive state (memory, emotion)
