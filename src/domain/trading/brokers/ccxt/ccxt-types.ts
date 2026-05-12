@@ -5,6 +5,16 @@ export interface CcxtBrokerConfig {
   sandbox: boolean
   demoTrading?: boolean
   options?: Record<string, unknown>
+  /**
+   * Margin trading mode. When set to 'cross', the broker:
+   * - Sets defaultType: 'margin' on the CCXT exchange instance
+   * - Routes orders through margin endpoints
+   * - Exposes margin-specific methods (getMarginAccount, borrow, repay, transferFunding)
+   *
+   * 'none' (default): spot trading only.
+   * 'cross': Cross Margin (single wallet, all positions share collateral).
+   */
+  marginType?: 'none' | 'cross'
   // CCXT standard credential fields (all optional — each exchange requires a different subset)
   apiKey?: string
   secret?: string

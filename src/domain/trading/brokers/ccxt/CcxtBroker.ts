@@ -23,6 +23,10 @@ import {
   type MarketClock,
   type BrokerConfigField,
   type TpSlParams,
+  type MarginAccount,
+  type MarginAsset,
+  type MarginOperationResult,
+  type FundingTransfer,
 } from '../types.js'
 import '../../contract-ext.js'
 import { CCXT_CREDENTIAL_FIELDS, type CcxtBrokerConfig, type CcxtMarket, type FundingRate, type OrderBook, type OrderBookLevel } from './ccxt-types.js'
@@ -147,6 +151,8 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
   private exchangeName: string
   private initialized = false
   private overrides: CcxtExchangeOverrides
+  /** True when marginType === 'cross'. Used to gate margin-only methods. */
+  private isMargin = false
   // orderId → ccxtSymbol cache (CCXT needs symbol to cancel)
   private orderSymbolCache = new Map<string, string>()
 
@@ -169,7 +175,17 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     // The init() wrapper below handles option-skipping uniformly via type filtering.
     const cfgRecord = config as unknown as Record<string, unknown>
     const credentials: Record<string, unknown> = {}
-    if (config.options !== undefined) credentials.options = config.options
+
+    // When marginType is 'cross', tell CCXT to use margin endpoints by default.
+    // For Binance, defaultType: 'margin' routes all requests through the margin wallet.
+    if (config.marginType === 'cross') {
+      this.isMargin = true
+      const existingOptions = config.options ?? {}
+      credentials.options = { ...existingOptions, defaultType: 'margin' }
+    } else if (config.options !== undefined) {
+      credentials.options = config.options
+    }
+
     for (const field of CCXT_CREDENTIAL_FIELDS) {
       const v = cfgRecord[field]
       if (v !== undefined) credentials[field] = v
@@ -413,6 +429,20 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
         params.stopLoss = {
           triggerPrice: parseFloat(tpsl.stopLoss.price),
           ...(tpsl.stopLoss.limitPrice && { price: parseFloat(tpsl.stopLoss.limitPrice) }),
+        }
+      }
+
+      // Map margin order parameters to CCXT params (passed through to Binance as-is).
+      if (order.marginParams) {
+        if (order.marginParams.sideEffectType) {
+          params.sideEffectType = order.marginParams.sideEffectType
+        }
+        if (order.marginParams.isIsolated !== undefined) {
+          params.isIsolated = order.marginParams.isIsolated
+        }
+        // Signal to CCXT that this is a margin order when broker is in margin mode.
+        if (this.isMargin) {
+          params.type = 'margin'
         }
       }
 
@@ -910,6 +940,120 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
         bids: book.bids.map(([p, a]) => [p ?? 0, a ?? 0] as OrderBookLevel),
         asks: book.asks.map(([p, a]) => [p ?? 0, a ?? 0] as OrderBookLevel),
         timestamp: new Date(book.timestamp ?? Date.now()),
+      }
+    } catch (err) {
+      throw BrokerError.from(err)
+    }
+  }
+
+  // ---- Margin operations (only available when marginType === 'cross') ----
+
+  /**
+   * Asserts that this broker is configured for margin trading.
+   * Throws BrokerError('CONFIG', ...) if not.
+   */
+  private _requireMargin(): void {
+    if (!this.isMargin) {
+      throw new BrokerError('CONFIG', `CcxtBroker[${this.id}]: margin operations require marginType='cross'`)
+    }
+  }
+
+  /**
+   * Get the Cross Margin account snapshot.
+   * Uses Binance's SAPI endpoint via CCXT's implicit method.
+   */
+  async getMarginAccount(): Promise<MarginAccount> {
+    this._requireMargin()
+    try {
+      const ex = this.exchange as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>
+      const raw = await ex['sapiGetMarginAccount']({}) as Record<string, unknown>
+      return {
+        totalAssetBtc: String(raw.totalAssetOfBtc ?? '0'),
+        totalLiabilityBtc: String(raw.totalLiabilityOfBtc ?? '0'),
+        totalNetAssetBtc: String(raw.totalNetAssetOfBtc ?? '0'),
+        marginLevel: String(raw.marginLevel ?? '0'),
+        borrowEnabled: Boolean(raw.borrowEnabled),
+        transferEnabled: Boolean(raw.transferEnabled),
+        tradeEnabled: Boolean(raw.tradeEnabled),
+      }
+    } catch (err) {
+      throw BrokerError.from(err)
+    }
+  }
+
+  /**
+   * List all margin assets with their borrow/free/locked state.
+   * Parses userAssets array from the margin account snapshot.
+   */
+  async getMarginAssets(): Promise<MarginAsset[]> {
+    this._requireMargin()
+    try {
+      const ex = this.exchange as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>
+      const raw = await ex['sapiGetMarginAccount']({}) as { userAssets?: Array<Record<string, string>> }
+      return (raw.userAssets ?? []).map(a => ({
+        asset: a.asset,
+        free: String(a.free ?? '0'),
+        locked: String(a.locked ?? '0'),
+        borrowed: String(a.borrowed ?? '0'),
+        interest: String(a.interest ?? '0'),
+        netAsset: String(a.netAsset ?? '0'),
+      }))
+    } catch (err) {
+      throw BrokerError.from(err)
+    }
+  }
+
+  /**
+   * Borrow an asset against the margin account's collateral.
+   * Binance endpoint: POST /sapi/v1/margin/loan
+   */
+  async borrow(asset: string, amount: string): Promise<MarginOperationResult> {
+    this._requireMargin()
+    try {
+      const ex = this.exchange as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>
+      const result = await ex['sapiPostMarginLoan']({ asset, amount }) as { tranId?: string | number }
+      return {
+        txId: String(result.tranId ?? ''),
+      }
+    } catch (err) {
+      throw BrokerError.from(err)
+    }
+  }
+
+  /**
+   * Repay a borrowed amount.
+   * Binance endpoint: POST /sapi/v1/margin/repay
+   */
+  async repay(asset: string, amount: string): Promise<MarginOperationResult> {
+    this._requireMargin()
+    try {
+      const ex = this.exchange as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>
+      const result = await ex['sapiPostMarginRepay']({ asset, amount }) as { tranId?: string | number }
+      return {
+        txId: String(result.tranId ?? ''),
+      }
+    } catch (err) {
+      throw BrokerError.from(err)
+    }
+  }
+
+  /**
+   * Transfer funds between Spot Wallet and Cross Margin Wallet.
+   * Binance endpoint: POST /sapi/v1/margin/transfer
+   * type=1: SPOT → MARGIN, type=2: MARGIN → SPOT
+   */
+  async transferFunding(op: FundingTransfer): Promise<MarginOperationResult> {
+    this._requireMargin()
+    try {
+      const binanceType = op.type === 'SPOT_TO_CROSS_MARGIN' ? 1 : 2
+      const ex = this.exchange as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>
+      const result = await ex['sapiPostMarginTransfer']({
+        asset: op.asset,
+        amount: op.amount,
+        type: binanceType,
+      }) as { tranId?: string | number }
+      return {
+        txId: String(result.tranId ?? ''),
       }
     } catch (err) {
       throw BrokerError.from(err)

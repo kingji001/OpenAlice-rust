@@ -32,6 +32,11 @@ vi.mock('ccxt', () => {
     this.fetchClosedOrder = vi.fn()
     this.fetchFundingRate = vi.fn()
     this.fetchOrderBook = vi.fn()
+    // Binance SAPI margin endpoints (CCXT implicit API methods)
+    this.sapiGetMarginAccount = vi.fn()
+    this.sapiPostMarginLoan = vi.fn()
+    this.sapiPostMarginRepay = vi.fn()
+    this.sapiPostMarginTransfer = vi.fn()
   })
 
   return {
@@ -1191,5 +1196,171 @@ describe('CcxtBroker — close', () => {
   it('resolves without error (no-op)', async () => {
     const acc = makeAccount()
     await expect(acc.close()).resolves.toBeUndefined()
+  })
+})
+
+// ==================== Cross Margin mode ====================
+
+function makeMarginAccount() {
+  return new CcxtBroker({
+    exchange: 'binance',
+    apiKey: 'k',
+    secret: 's',
+    sandbox: false,
+    marginType: 'cross',
+  })
+}
+
+describe('CcxtBroker — Cross Margin mode', () => {
+  it('getMarginAccount returns parsed snapshot from sapiGetMarginAccount', async () => {
+    const acc = makeMarginAccount()
+    setInitialized(acc, {})
+
+    ;(acc as any).exchange.sapiGetMarginAccount = vi.fn().mockResolvedValue({
+      totalAssetOfBtc: '1.23456789',
+      totalLiabilityOfBtc: '0.5',
+      totalNetAssetOfBtc: '0.73456789',
+      marginLevel: '2.5',
+      borrowEnabled: true,
+      transferEnabled: true,
+      tradeEnabled: true,
+    })
+
+    const result = await acc.getMarginAccount!()
+    expect(result.totalAssetBtc).toBe('1.23456789')
+    expect(result.totalLiabilityBtc).toBe('0.5')
+    expect(result.totalNetAssetBtc).toBe('0.73456789')
+    expect(result.marginLevel).toBe('2.5')
+    expect(result.borrowEnabled).toBe(true)
+    expect(result.transferEnabled).toBe(true)
+    expect(result.tradeEnabled).toBe(true)
+    expect((acc as any).exchange.sapiGetMarginAccount).toHaveBeenCalledWith({})
+  })
+
+  it('getMarginAssets parses userAssets array', async () => {
+    const acc = makeMarginAccount()
+    setInitialized(acc, {})
+
+    ;(acc as any).exchange.sapiGetMarginAccount = vi.fn().mockResolvedValue({
+      userAssets: [
+        { asset: 'BTC', free: '0.5', locked: '0.1', borrowed: '0.2', interest: '0.001', netAsset: '0.299' },
+        { asset: 'USDT', free: '1000', locked: '200', borrowed: '500', interest: '0.5', netAsset: '299.5' },
+      ],
+    })
+
+    const assets = await acc.getMarginAssets!()
+    expect(assets).toHaveLength(2)
+    expect(assets[0]).toEqual({
+      asset: 'BTC',
+      free: '0.5',
+      locked: '0.1',
+      borrowed: '0.2',
+      interest: '0.001',
+      netAsset: '0.299',
+    })
+    expect(assets[1].asset).toBe('USDT')
+    expect(assets[1].free).toBe('1000')
+  })
+
+  it('borrow calls sapiPostMarginLoan with correct params and returns txId', async () => {
+    const acc = makeMarginAccount()
+    setInitialized(acc, {})
+
+    ;(acc as any).exchange.sapiPostMarginLoan = vi.fn().mockResolvedValue({ tranId: 12345 })
+
+    const result = await acc.borrow!('USDT', '500')
+    expect(result.txId).toBe('12345')
+    expect((acc as any).exchange.sapiPostMarginLoan).toHaveBeenCalledWith({ asset: 'USDT', amount: '500' })
+  })
+
+  it('repay calls sapiPostMarginRepay with correct params', async () => {
+    const acc = makeMarginAccount()
+    setInitialized(acc, {})
+
+    ;(acc as any).exchange.sapiPostMarginRepay = vi.fn().mockResolvedValue({ tranId: '67890' })
+
+    const result = await acc.repay!('BTC', '0.1')
+    expect(result.txId).toBe('67890')
+    expect((acc as any).exchange.sapiPostMarginRepay).toHaveBeenCalledWith({ asset: 'BTC', amount: '0.1' })
+  })
+
+  it('transferFunding maps SPOT_TO_CROSS_MARGIN direction to Binance type=1', async () => {
+    const acc = makeMarginAccount()
+    setInitialized(acc, {})
+
+    ;(acc as any).exchange.sapiPostMarginTransfer = vi.fn().mockResolvedValue({ tranId: 11111 })
+
+    const result = await acc.transferFunding!({ type: 'SPOT_TO_CROSS_MARGIN', asset: 'USDT', amount: '100' })
+    expect(result.txId).toBe('11111')
+    expect((acc as any).exchange.sapiPostMarginTransfer).toHaveBeenCalledWith({ asset: 'USDT', amount: '100', type: 1 })
+  })
+
+  it('transferFunding maps CROSS_MARGIN_TO_SPOT direction to Binance type=2', async () => {
+    const acc = makeMarginAccount()
+    setInitialized(acc, {})
+
+    ;(acc as any).exchange.sapiPostMarginTransfer = vi.fn().mockResolvedValue({ tranId: 22222 })
+
+    const result = await acc.transferFunding!({ type: 'CROSS_MARGIN_TO_SPOT', asset: 'BTC', amount: '0.05' })
+    expect(result.txId).toBe('22222')
+    expect((acc as any).exchange.sapiPostMarginTransfer).toHaveBeenCalledWith({ asset: 'BTC', amount: '0.05', type: 2 })
+  })
+
+  it('getMarginAccount throws BrokerError when marginType is not cross', async () => {
+    const acc = makeAccount() // spot mode, no marginType
+    setInitialized(acc, {})
+
+    await expect(acc.getMarginAccount!()).rejects.toThrow("margin operations require marginType='cross'")
+  })
+
+  it('placeOrder forwards order.marginParams to CCXT params (sideEffectType)', async () => {
+    const acc = makeMarginAccount()
+    setInitialized(acc, {
+      'BTC/USDT:USDT': makeSwapMarket('BTC', 'USDT', 'BTC/USDT:USDT'),
+    })
+    ;(acc as any).exchange.createOrder = vi.fn().mockResolvedValue({ id: 'margin-ord-1', status: 'open' })
+
+    const contract = new Contract()
+    contract.localSymbol = 'BTC/USDT:USDT'
+    const order = new Order()
+    order.action = 'BUY'
+    order.orderType = 'MKT'
+    order.totalQuantity = new Decimal(0.1)
+    order.marginParams = { sideEffectType: 'MARGIN_BUY', isIsolated: false }
+
+    const result = await acc.placeOrder(contract, order)
+    expect(result.success).toBe(true)
+
+    const call = (acc as any).exchange.createOrder.mock.calls[0]
+    const params = call[5] // 6th arg (0-indexed) is the params object
+    expect(params.sideEffectType).toBe('MARGIN_BUY')
+    expect(params.isIsolated).toBe(false)
+    expect(params.type).toBe('margin')
+  })
+
+  it('placeOrder without marginParams works in spot mode unchanged (regression)', async () => {
+    const acc = makeAccount() // spot mode
+    setInitialized(acc, {
+      'ETH/USDT:USDT': makeSwapMarket('ETH', 'USDT', 'ETH/USDT:USDT'),
+    })
+    ;(acc as any).exchange.createOrder = vi.fn().mockResolvedValue({ id: 'spot-ord-1', status: 'open' })
+
+    const contract = new Contract()
+    contract.localSymbol = 'ETH/USDT:USDT'
+    const order = new Order()
+    order.action = 'SELL'
+    order.orderType = 'MKT'
+    order.totalQuantity = new Decimal(0.5)
+    // No marginParams — pure spot order
+
+    const result = await acc.placeOrder(contract, order)
+    expect(result.success).toBe(true)
+
+    const call = (acc as any).exchange.createOrder.mock.calls[0]
+    const params = call[5]
+    // Margin params must NOT be present in a spot order
+    expect(params.sideEffectType).toBeUndefined()
+    expect(params.isIsolated).toBeUndefined()
+    expect(params.type).toBeUndefined()
   })
 })
