@@ -67,6 +67,17 @@ pub trait Broker: Send + Sync {
     fn capabilities(&self) -> BrokerCapabilities {
         BrokerCapabilities::default()
     }
+
+    /// Allocate a unique client-order-id for the next broker call.
+    /// Per-broker strategy: Mock uses a monotonic counter; IBKR derives from
+    /// nextValidId; Alpaca uses commit-hash-suffixed strings. Used by Phase 4e
+    /// journal to record what was sent to the broker before the call.
+    fn allocate_client_order_id(&self) -> String;
+
+    /// Look up an order by its client-order-id. Used by restart reconciliation
+    /// to determine whether an in-flight order was actually accepted.
+    /// Returns None if no order matches.
+    async fn lookup_by_client_order_id(&self, id: &str) -> Result<Option<OpenOrder>, BrokerError>;
 }
 
 #[cfg(test)]

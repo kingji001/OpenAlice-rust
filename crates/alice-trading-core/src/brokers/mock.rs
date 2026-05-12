@@ -98,6 +98,7 @@ pub struct MockBroker {
     // async and serialized in production via the actor).
     state: Mutex<MockBrokerState>,
     next_order_id: AtomicU64,
+    next_client_order_id: AtomicU64,
     fail_remaining: AtomicU32,
 }
 
@@ -121,6 +122,7 @@ impl MockBroker {
                 call_log: Vec::new(),
             }),
             next_order_id: AtomicU64::new(1),
+            next_client_order_id: AtomicU64::new(1),
             fail_remaining: AtomicU32::new(0),
         }
     }
@@ -652,6 +654,35 @@ impl Broker for MockBroker {
             message: None,
             consecutive_failures: None,
         }
+    }
+
+    fn allocate_client_order_id(&self) -> String {
+        let n = self.next_client_order_id.fetch_add(1, Ordering::SeqCst);
+        format!("mock-cli-{}", n)
+    }
+
+    async fn lookup_by_client_order_id(&self, id: &str) -> Result<Option<OpenOrder>, BrokerError> {
+        self.record("lookupByClientOrderId", vec![json!(id)]);
+        self.check_fail("lookupByClientOrderId")?;
+        let state = self.state.lock().unwrap();
+        for (_, internal_order) in state.orders.iter() {
+            // Check if the order's `clientOrderId` field matches
+            if internal_order
+                .order
+                .get("clientOrderId")
+                .and_then(|v| v.as_str())
+                == Some(id)
+            {
+                return Ok(Some(OpenOrder {
+                    contract: internal_order.contract.clone(),
+                    order: internal_order.order.clone(),
+                    order_state: json!({ "status": format!("{:?}", internal_order.status) }),
+                    avg_fill_price: internal_order.fill_price.as_ref().map(|p| p.to_string()),
+                    tpsl: None,
+                }));
+            }
+        }
+        Ok(None)
     }
 }
 
