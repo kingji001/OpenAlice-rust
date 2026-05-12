@@ -52,6 +52,7 @@ export class RustUtaProxy {
   private accountConfig: UTAConfig
   private lastSeq = 0
   private _started = false
+  private _eventQueue: Promise<void> = Promise.resolve()
   private _cachedHealth: BrokerHealth = 'healthy'
   private _cachedHealthInfo: BrokerHealthInfo = {
     status: 'healthy',
@@ -420,6 +421,7 @@ export class RustUtaProxy {
         }
         const reconstructed = new Error(data.message)
         Object.setPrototypeOf(reconstructed, BrokerError.prototype)
+        ;(reconstructed as any).name = 'BrokerError'
         // BrokerError.code and .permanent are readonly in TS, but we need to set
         // them on the reconstructed error. Use Object.defineProperty to bypass readonly.
         Object.defineProperty(reconstructed, 'code', { value: data.code, writable: false, enumerable: true })
@@ -443,16 +445,24 @@ export class RustUtaProxy {
   private _dispatchEvent(err: Error | null, event?: TradingCoreEvent): void {
     if (err || !event) return
 
-    // Gap detection — if seq jumps, backfill missed events from ring buffer
-    const expected = this.lastSeq + 1
-    if (this.lastSeq > 0 && event.seq !== expected) {
-      this._backfill(this.lastSeq).catch(() => {
-        // Backfill failed — gap remains; best-effort
-      })
-    }
-
-    this._applyEvent(event)
-    this.lastSeq = Math.max(this.lastSeq, event.seq)
+    // Queue all event processing onto a sequential promise chain so that
+    // backfill is always awaited BEFORE _applyEvent runs for the triggering
+    // event, preventing duplicate application of backfilled events.
+    this._eventQueue = this._eventQueue.then(async () => {
+      const expected = this.lastSeq + 1
+      if (this.lastSeq > 0 && event.seq !== expected) {
+        // Gap detected — backfill missed events up to (but not including) this event
+        try {
+          await this._backfill(this.lastSeq, event.seq)
+        } catch (e) {
+          console.warn(`[RustUtaProxy ${this.id}] backfill failed:`, e)
+        }
+      }
+      this._applyEvent(event)
+      this.lastSeq = Math.max(this.lastSeq, Number(event.seq))
+    }).catch(e => {
+      console.warn(`[RustUtaProxy ${this.id}] event dispatch error:`, e)
+    })
   }
 
   private _applyEvent(event: TradingCoreEvent): void {
@@ -504,12 +514,12 @@ export class RustUtaProxy {
     }
   }
 
-  private async _backfill(afterSeq: number): Promise<void> {
+  private async _backfill(afterSeq: number, upToSeq?: number): Promise<void> {
     const missed = this.tc.eventLogRecent(this.id, afterSeq)
     for (const ev of missed) {
-      if (ev.seq > afterSeq) {
+      if (ev.seq > afterSeq && (upToSeq === undefined || ev.seq < upToSeq)) {
         this._applyEvent(ev)
-        this.lastSeq = Math.max(this.lastSeq, ev.seq)
+        this.lastSeq = Math.max(this.lastSeq, Number(ev.seq))
       }
     }
   }
