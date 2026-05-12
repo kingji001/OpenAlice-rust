@@ -4,6 +4,7 @@
 
 #![deny(clippy::all)]
 
+pub mod brokers;
 pub mod canonical;
 pub mod decimal;
 pub mod git;
