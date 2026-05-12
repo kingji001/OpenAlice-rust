@@ -59,28 +59,18 @@ export interface ContractSearchResult {
 
 // ==================== UTAManager ====================
 
-export interface SnapshotHooks {
-  onPostPush?: (utaId: string) => void | Promise<void>
-  onPostReject?: (utaId: string) => void | Promise<void>
-}
-
 export class UTAManager {
   private entries = new Map<string, UnifiedTradingAccount>()
   private reconnecting = new Set<string>()
 
   private eventLog?: EventLog
   private toolCenter?: ToolCenter
-  private _snapshotHooks?: SnapshotHooks
   private fxService?: FxService
 
-  constructor(deps?: { eventLog: EventLog; toolCenter: ToolCenter; fxService?: FxService }) {
+  constructor(deps?: { eventLog?: EventLog; toolCenter?: ToolCenter; fxService?: FxService }) {
     this.eventLog = deps?.eventLog
     this.toolCenter = deps?.toolCenter
     this.fxService = deps?.fxService
-  }
-
-  setSnapshotHooks(hooks: SnapshotHooks): void {
-    this._snapshotHooks = hooks
   }
 
   setFxService(fx: FxService): void {
@@ -100,8 +90,7 @@ export class UTAManager {
       onHealthChange: (utaId, health) => {
         this.eventLog?.append('account.health', { accountId: utaId, ...health })
       },
-      onPostPush: this._snapshotHooks?.onPostPush,
-      onPostReject: this._snapshotHooks?.onPostReject,
+      eventLog: this.eventLog,
     })
     this.add(uta)
     return uta

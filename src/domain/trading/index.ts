@@ -11,7 +11,6 @@ export type {
   UTASummary,
   AggregatedEquity,
   ContractSearchResult,
-  SnapshotHooks,
 } from './uta-manager.js'
 
 // Brokers (types + implementations + factory)

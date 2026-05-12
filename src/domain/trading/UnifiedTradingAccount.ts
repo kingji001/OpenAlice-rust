@@ -29,6 +29,7 @@ import type {
 } from './git/types.js'
 import { createGuardPipeline, resolveGuards } from './guards/index.js'
 import { TsUtaActor } from './uta-actor.js'
+import type { EventLog } from '../../core/event-log.js'
 import './contract-ext.js'
 
 // ==================== Options ====================
@@ -38,8 +39,10 @@ export interface UnifiedTradingAccountOptions {
   savedState?: GitExportState
   onCommit?: (state: GitExportState) => void | Promise<void>
   onHealthChange?: (accountId: string, health: BrokerHealthInfo) => void
+  /** @deprecated Use eventLog injection + subscribe to 'commit.notify' instead. */
   onPostPush?: (accountId: string) => void | Promise<void>
   onPostReject?: (accountId: string) => void | Promise<void>
+  eventLog?: EventLog
 }
 
 // ==================== Stage param types ====================
@@ -103,6 +106,7 @@ export class UnifiedTradingAccount {
   private readonly _onHealthChange?: (accountId: string, health: BrokerHealthInfo) => void
   private readonly _onPostPush?: (accountId: string) => void | Promise<void>
   private readonly _onPostReject?: (accountId: string) => void | Promise<void>
+  private readonly _eventLog?: EventLog
 
   // ---- Health tracking ----
   private static readonly DEGRADED_THRESHOLD = 3
@@ -126,6 +130,7 @@ export class UnifiedTradingAccount {
     this._onHealthChange = options.onHealthChange
     this._onPostPush = options.onPostPush
     this._onPostReject = options.onPostReject
+    this._eventLog = options.eventLog
 
     // Wire internals
     this._getState = async (): Promise<GitState> => {
@@ -467,7 +472,17 @@ export class UnifiedTradingAccount {
       throw new BrokerError('NETWORK', `Account "${this.label}" is offline. Cannot execute trades.`)
     }
     const result = await this.git.push()
+    // Legacy inline callback (deprecated — prefer EventLog subscription)
     Promise.resolve(this._onPostPush?.(this.id)).catch(() => {})
+    // EventLog-based notification
+    if (this._eventLog) {
+      void this._eventLog.append('commit.notify', {
+        accountId: this.id,
+        commitHash: result.hash,
+      }).catch((err) => {
+        console.warn(`UTA[${this.id}]: commit.notify emit failed: ${err}`)
+      })
+    }
     return result
   }
 
@@ -477,7 +492,17 @@ export class UnifiedTradingAccount {
 
   async _doReject(reason?: string): Promise<RejectResult> {
     const result = await this.git.reject(reason)
+    // Legacy inline callback (deprecated — prefer EventLog subscription)
     Promise.resolve(this._onPostReject?.(this.id)).catch(() => {})
+    // EventLog-based notification
+    if (this._eventLog) {
+      void this._eventLog.append('reject.notify', {
+        accountId: this.id,
+        commitHash: result.hash,
+      }).catch((err) => {
+        console.warn(`UTA[${this.id}]: reject.notify emit failed: ${err}`)
+      })
+    }
     return result
   }
 

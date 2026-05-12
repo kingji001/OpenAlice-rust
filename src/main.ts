@@ -113,9 +113,15 @@ async function main() {
   // ==================== Snapshot ====================
 
   const snapshotService = createSnapshotService({ utaManager, eventLog })
-  utaManager.setSnapshotHooks({
-    onPostPush: (id) => { snapshotService.takeSnapshot(id, 'post-push') },
-    onPostReject: (id) => { snapshotService.takeSnapshot(id, 'post-reject') },
+
+  // Subscribe to EventLog-based snapshot triggers — replaces the old setSnapshotHooks inline callbacks
+  eventLog.subscribeType('commit.notify', (entry) => {
+    const { accountId } = entry.payload as { accountId: string }
+    void snapshotService.takeSnapshot(accountId, 'post-push').catch(() => {})
+  })
+  eventLog.subscribeType('reject.notify', (entry) => {
+    const { accountId } = entry.payload as { accountId: string }
+    void snapshotService.takeSnapshot(accountId, 'post-reject').catch(() => {})
   })
 
   // ==================== Brain ====================
