@@ -41,6 +41,7 @@
     "@sinclair/typebox": "0.34.48",
     "@traderalice/ibkr": "workspace:*",
     "@traderalice/opentypebb": "workspace:*",
+    "@traderalice/trading-core-bindings": "workspace:*",
     "ai": "^6.0.86",
     "ajv": "^8.18.0",
     "ccxt": "^4.5.38",

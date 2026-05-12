@@ -149,9 +149,11 @@ hitting the broker, which otherwise expects the bare base ticker.`,
         if (aliceId) query.aliceId = aliceId
         if (secType) query.secType = secType
         if (currency) query.currency = currency
-        const details = await uta.getContractDetails(query)
+        // getContractDetails is only available on TS-backed UTAs (Phase 6 for Rust).
+        if (!('getContractDetails' in uta)) return { error: 'Contract details not available for this account type.' }
+        const details = await (uta as { getContractDetails: (q: typeof query) => Promise<unknown> }).getContractDetails(query)
         if (!details) return { error: 'No contract details found.' }
-        return { source: uta.id, ...details }
+        return { source: uta.id, ...(details as Record<string, unknown>) }
       },
     }),
 
@@ -362,7 +364,15 @@ IMPORTANT: Check this BEFORE making new trading decisions.`,
         const targets = manager.resolve(source)
         if (targets.length === 0) return { error: 'No accounts available.' }
         const results: Array<Record<string, unknown>> = []
-        for (const uta of targets) results.push({ source: uta.id, ...await uta.simulatePriceChange(priceChanges) })
+        for (const uta of targets) {
+          // simulatePriceChange is only available on TS-backed UTAs (Phase 6 for Rust).
+          if (!('simulatePriceChange' in uta)) {
+            results.push({ source: uta.id, error: 'Price simulation not available for this account type.' })
+            continue
+          }
+          const simResult = await (uta as unknown as { simulatePriceChange: (p: typeof priceChanges) => Promise<Record<string, unknown>> }).simulatePriceChange(priceChanges)
+          results.push({ source: uta.id, ...simResult })
+        }
         return results.length === 1 ? results[0] : results
       },
     }),

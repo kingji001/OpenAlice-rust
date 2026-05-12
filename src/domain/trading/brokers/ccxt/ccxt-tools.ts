@@ -8,6 +8,7 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import { Contract } from '@traderalice/ibkr'
 import type { UTAManager } from '../../uta-manager.js'
+import { isTsUta } from '../../uta-manager.js'
 import { CcxtBroker } from './CcxtBroker.js'
 import '../../contract-ext.js'
 
@@ -15,6 +16,7 @@ export function createCcxtProviderTools(manager: UTAManager) {
   /** Resolve to exactly one CcxtBroker. Returns error object if unable. */
   const resolveCcxtOne = (source?: string): { broker: CcxtBroker; id: string } | { error: string } => {
     const targets = manager.resolve(source)
+      .filter(isTsUta)
       .filter((uta): uta is typeof uta & { broker: CcxtBroker } => uta.broker instanceof CcxtBroker)
     if (targets.length === 0) return { error: 'No CCXT account available.' }
     if (targets.length > 1) {

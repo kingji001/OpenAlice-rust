@@ -441,9 +441,13 @@ async function main() {
   const CATALOG_REFRESH_MS = 6 * 60 * 60 * 1000  // 6h
   const catalogRefreshTimer = setInterval(() => {
     for (const uta of utaManager.resolve()) {
-      uta.refreshCatalog().catch((err) => {
-        console.warn(`[catalog-refresh] ${uta.id} failed:`, err instanceof Error ? err.message : err)
-      })
+      // refreshCatalog is only available on TS-backed UTAs (RustUtaProxy delegates
+      // catalog caching to the Rust actor internally).
+      if (typeof (uta as { refreshCatalog?: unknown }).refreshCatalog === 'function') {
+        (uta as { refreshCatalog: () => Promise<void> }).refreshCatalog().catch((err: unknown) => {
+          console.warn(`[catalog-refresh] ${uta.id} failed:`, err instanceof Error ? err.message : err)
+        })
+      }
     }
   }, CATALOG_REFRESH_MS)
   // Don't keep the process alive just for the refresh loop — shutdown logic

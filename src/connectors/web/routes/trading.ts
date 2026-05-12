@@ -3,7 +3,7 @@ import type { Context } from 'hono'
 import { z } from 'zod'
 import type { EngineContext } from '../../../core/types.js'
 import { BrokerError } from '../../../domain/trading/brokers/types.js'
-import type { UnifiedTradingAccount } from '../../../domain/trading/UnifiedTradingAccount.js'
+import type { AnyUta } from '../../../domain/trading/uta-manager.js'
 import { searchTradeableContracts } from '../../../domain/trading/contract-search.js'
 import type { AssetClassHint } from '../../../domain/trading/contract-search-rules.js'
 
@@ -66,7 +66,7 @@ const cancelOrderSchema = z.object({
  */
 async function executeOneShot(
   c: Context,
-  uta: UnifiedTradingAccount,
+  uta: AnyUta,
   message: string,
   stage: () => unknown,
 ): Promise<Response> {
@@ -98,7 +98,7 @@ const ALLOWED_ASSET_CLASSES: ReadonlySet<AssetClassHint> = new Set([
 ])
 
 /** Resolve account by :id param, return 404 if not found. */
-function resolveAccount(ctx: EngineContext, c: Context): UnifiedTradingAccount | null {
+function resolveAccount(ctx: EngineContext, c: Context): AnyUta | null {
   const id = c.req.param('id')
   if (!id) return null
   return ctx.utaManager.get(id) ?? null
@@ -112,7 +112,7 @@ function resolveAccount(ctx: EngineContext, c: Context): UnifiedTradingAccount |
  */
 async function queryAccount<T>(
   c: Context,
-  account: UnifiedTradingAccount,
+  account: AnyUta,
   fn: () => Promise<T>,
 ): Promise<Response> {
   if (account.health === 'offline') {

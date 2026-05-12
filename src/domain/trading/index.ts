@@ -5,13 +5,15 @@ import './contract-ext.js'
 export { UnifiedTradingAccount } from './UnifiedTradingAccount.js'
 export type { UnifiedTradingAccountOptions, StagePlaceOrderParams, StageModifyOrderParams, StageClosePositionParams } from './UnifiedTradingAccount.js'
 
-// UTAManager
-export { UTAManager } from './uta-manager.js'
+// UTAManager + Rust proxy
+export { UTAManager, isTsUta, isRustProxy } from './uta-manager.js'
 export type {
   UTASummary,
   AggregatedEquity,
   ContractSearchResult,
+  AnyUta,
 } from './uta-manager.js'
+export { RustUtaProxy } from './unified-trading-account-rust.js'
 
 // Brokers (types + implementations + factory)
 export type {

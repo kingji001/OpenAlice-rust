@@ -3,6 +3,11 @@
  *
  * Owns the full UTA lifecycle: create → register → reconnect → remove → close.
  * Also provides cross-UTA operations (aggregated equity, contract search).
+ *
+ * Phase 4f: UTAManager accepts an optional TradingCore binding and
+ * TradingCoreConfig. When present, accounts whose `brokerImpl` resolves to
+ * 'rust' are backed by a RustUtaProxy instead of the TS UnifiedTradingAccount.
+ * When absent, ALL accounts use the TS path — backward compatible.
  */
 
 import Decimal from 'decimal.js'
@@ -13,13 +18,28 @@ import { createCcxtProviderTools } from './brokers/ccxt/ccxt-tools.js'
 import { createBroker } from './brokers/factory.js'
 import { getBrokerPreset } from './brokers/preset-catalog.js'
 import { UnifiedTradingAccount } from './UnifiedTradingAccount.js'
+import { RustUtaProxy } from './unified-trading-account-rust.js'
 import { loadGitState, createGitPersister } from './git-persistence.js'
-import { readUTAsConfig, type UTAConfig } from '../../core/config.js'
+import { readUTAsConfig, type UTAConfig, type TradingCoreConfig } from '../../core/config.js'
 import type { EventLog } from '../../core/event-log.js'
 import type { ToolCenter } from '../../core/tool-center.js'
 import type { ReconnectResult } from '../../core/types.js'
 import type { FxService } from './fx-service.js'
+import type { TradingCore } from '@traderalice/trading-core-bindings'
 import './contract-ext.js'
+
+/** Union type covering both TS and Rust-backed UTAs. */
+export type AnyUta = UnifiedTradingAccount | RustUtaProxy
+
+/** Type guard: returns true when the UTA is backed by the TS implementation. */
+export function isTsUta(uta: AnyUta): uta is UnifiedTradingAccount {
+  return uta instanceof UnifiedTradingAccount
+}
+
+/** Type guard: returns true when the UTA is backed by the Rust proxy. */
+export function isRustProxy(uta: AnyUta): uta is RustUtaProxy {
+  return uta instanceof RustUtaProxy
+}
 
 // ==================== UTA summary ====================
 
@@ -60,30 +80,107 @@ export interface ContractSearchResult {
 // ==================== UTAManager ====================
 
 export class UTAManager {
-  private entries = new Map<string, UnifiedTradingAccount>()
+  private entries = new Map<string, AnyUta>()
   private reconnecting = new Set<string>()
 
   private eventLog?: EventLog
   private toolCenter?: ToolCenter
   private fxService?: FxService
+  /** Optional Rust napi binding — absent means all UTAs use the TS path. */
+  private tradingCore?: TradingCore
+  /** Rust routing config — resolves which broker impl to use per account type. */
+  private tradingCoreConfig?: TradingCoreConfig
 
-  constructor(deps?: { eventLog?: EventLog; toolCenter?: ToolCenter; fxService?: FxService }) {
+  constructor(deps?: {
+    eventLog?: EventLog
+    toolCenter?: ToolCenter
+    fxService?: FxService
+    tradingCore?: TradingCore
+    tradingCoreConfig?: TradingCoreConfig
+  }) {
     this.eventLog = deps?.eventLog
     this.toolCenter = deps?.toolCenter
     this.fxService = deps?.fxService
+    this.tradingCore = deps?.tradingCore
+    this.tradingCoreConfig = deps?.tradingCoreConfig
   }
 
   setFxService(fx: FxService): void {
     this.fxService = fx
   }
 
-  // ==================== Lifecycle ====================
+  // ==================== Routing ====================
 
-  /** Create a UTA from config, register it, and start async broker connection. */
-  async initUTA(cfg: UTAConfig): Promise<UnifiedTradingAccount> {
+  /**
+   * Resolve which broker implementation to use for this account config.
+   *
+   * Priority order:
+   * 1. Per-account `brokerImpl` override in the account config.
+   * 2. Global default from `tradingCoreConfig.defaultBrokerImpl[accountType]`.
+   * 3. Fall back to 'ts' when TradingCore is not initialized.
+   *
+   * CCXT accounts are pinned to 'ts' regardless of any override.
+   */
+  private _resolveImpl(cfg: UTAConfig): 'ts' | 'rust' {
+    if (!this.tradingCore) return 'ts'
+
+    const accountType = this._inferAccountType(cfg)
+
+    // CCXT is always TS — never migrates (Phase 4f design decision D8)
+    if (accountType === 'ccxt') return 'ts'
+
+    const explicit = cfg.brokerImpl
+    const globalDefault = this.tradingCoreConfig?.defaultBrokerImpl?.[
+      accountType as keyof TradingCoreConfig['defaultBrokerImpl']
+    ] ?? 'ts'
+
+    return explicit ?? globalDefault
+  }
+
+  /** Infer a simple account type string from presetId. */
+  private _inferAccountType(cfg: UTAConfig): string {
+    const presetId = cfg.presetId ?? ''
+    if (presetId.startsWith('mock')) return 'mock'
+    if (presetId.startsWith('alpaca')) return 'alpaca'
+    if (presetId.startsWith('ibkr')) return 'ibkr'
+    // Any CCXT-backed preset
+    if (presetId.startsWith('bybit') || presetId.startsWith('okx') ||
+        presetId.startsWith('hyperliquid') || presetId.startsWith('bitget') ||
+        presetId.startsWith('ccxt')) return 'ccxt'
+    return 'mock'
+  }
+
+  /**
+   * Spawn a UTA for the given config, dispatching to Rust proxy or TS
+   * implementation based on resolved impl.
+   */
+  private async _spawnUta(cfg: UTAConfig): Promise<AnyUta> {
+    const impl = this._resolveImpl(cfg)
+
+    if (impl === 'rust') {
+      if (!this.tradingCore || !this.eventLog) {
+        throw new Error(
+          `Account '${cfg.id}' configured for Rust impl but TradingCore or EventLog not initialized`,
+        )
+      }
+      const proxy = new RustUtaProxy({
+        accountConfig: cfg,
+        tradingCore: this.tradingCore,
+        eventLog: this.eventLog,
+      })
+      await proxy.start()
+      return proxy
+    }
+
+    // TS path (existing implementation)
+    return this._spawnTsUta(cfg)
+  }
+
+  /** Spawn a TS-backed UTA (original implementation path). */
+  private async _spawnTsUta(cfg: UTAConfig): Promise<UnifiedTradingAccount> {
     const broker = createBroker(cfg, { fxService: this.fxService })
     const savedState = await loadGitState(cfg.id)
-    const uta = new UnifiedTradingAccount(broker, {
+    return new UnifiedTradingAccount(broker, {
       guards: cfg.guards,
       savedState,
       onCommit: createGitPersister(cfg.id),
@@ -92,6 +189,13 @@ export class UTAManager {
       },
       eventLog: this.eventLog,
     })
+  }
+
+  // ==================== Lifecycle ====================
+
+  /** Create a UTA from config, register it, and start async broker connection. */
+  async initUTA(cfg: UTAConfig): Promise<AnyUta> {
+    const uta = await this._spawnUta(cfg)
     this.add(uta)
     return uta
   }
@@ -116,8 +220,10 @@ export class UTAManager {
 
       const uta = await this.initUTA(cfg)
 
-      // Wait for broker.init() + broker.getAccount() to verify the connection
-      await uta.waitForConnect()
+      // Wait for broker connection to verify — only TS UTAs have waitForConnect().
+      if (isTsUta(uta)) {
+        await uta.waitForConnect()
+      }
 
       // Re-register CCXT-specific tools if this UTA routes to the CCXT engine.
       if (getBrokerPreset(cfg.presetId).engine === 'ccxt') {
@@ -149,7 +255,9 @@ export class UTAManager {
 
   /** Register CCXT provider tools if any CCXT accounts are present. */
   registerCcxtToolsIfNeeded(): void {
-    const hasCcxt = this.resolve().some((uta) => uta.broker instanceof CcxtBroker)
+    const hasCcxt = this.resolve()
+      .filter(isTsUta)
+      .some((uta) => uta.broker instanceof CcxtBroker)
     if (hasCcxt) {
       this.toolCenter?.register(createCcxtProviderTools(this), 'trading-ccxt')
       console.log('ccxt: provider tools registered')
@@ -158,7 +266,7 @@ export class UTAManager {
 
   // ==================== Registration ====================
 
-  add(uta: UnifiedTradingAccount): void {
+  add(uta: AnyUta): void {
     if (this.entries.has(uta.id)) {
       throw new Error(`UTA "${uta.id}" already registered`)
     }
@@ -171,7 +279,7 @@ export class UTAManager {
 
   // ==================== Lookups ====================
 
-  get(id: string): UnifiedTradingAccount | undefined {
+  get(id: string): AnyUta | undefined {
     return this.entries.get(id)
   }
 
@@ -194,7 +302,7 @@ export class UTAManager {
 
   // ==================== Source routing ====================
 
-  resolve(source?: string): UnifiedTradingAccount[] {
+  resolve(source?: string): AnyUta[] {
     if (!source) {
       return Array.from(this.entries.values())
     }
@@ -203,7 +311,7 @@ export class UTAManager {
     return []
   }
 
-  resolveOne(source: string): UnifiedTradingAccount {
+  resolveOne(source: string): AnyUta {
     const results = this.resolve(source)
     if (results.length === 0) {
       throw new Error(`No UTA found matching source "${source}". Use listUTAs to see available UTAs.`)
@@ -287,8 +395,8 @@ export class UTAManager {
     pattern: string,
     accountId?: string,
   ): Promise<ContractSearchResult[]> {
-    const targets = accountId
-      ? [this.entries.get(accountId)].filter(Boolean) as UnifiedTradingAccount[]
+    const targets: AnyUta[] = accountId
+      ? [this.entries.get(accountId)].filter((u): u is AnyUta => u != null)
       : Array.from(this.entries.values())
 
     const results = await Promise.all(
@@ -315,7 +423,9 @@ export class UTAManager {
   ): Promise<ContractDetails | null> {
     const uta = this.entries.get(accountId)
     if (!uta) return null
-    return uta.getContractDetails(query)
+    // RustUtaProxy does not implement getContractDetails (Phase 6).
+    if (isTsUta(uta)) return uta.getContractDetails(query)
+    return null
   }
 
   // ==================== Cleanup ====================
