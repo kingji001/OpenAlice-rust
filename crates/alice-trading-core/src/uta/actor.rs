@@ -1,6 +1,7 @@
 //! UtaActor — single-task per-UTA event loop. Phase 4d Task B:
 //! tokio::select! over cmd_rx + signal_rx. GetHealth and NudgeRecovery
-//! wired. Phase 4d Task D wires Push/Reject/Sync to TradingGit + broker.
+//! wired. Phase 4d Task D wires Push/Reject/Sync to TradingGit + broker;
+//! Phase 4e Task C wires the journal recipe.
 
 use std::sync::Arc;
 
@@ -187,28 +188,43 @@ impl UtaActor {
             .collect();
         for (op, cli_id) in ops_with_cli_ids.iter_mut().zip(client_order_ids.iter()) {
             if let Operation::PlaceOrder { order, .. } = op {
-                if let Some(obj) = order.as_object_mut() {
-                    obj.insert(
-                        "clientOrderId".to_string(),
-                        serde_json::Value::String(cli_id.clone()),
-                    );
+                // Issue 3 fix: warn when PlaceOrder.order is not a JSON object so that a
+                // journal/broker mismatch is surfaced rather than silently no-oped.
+                match order.as_object_mut() {
+                    Some(obj) => {
+                        obj.insert(
+                            "clientOrderId".to_string(),
+                            serde_json::Value::String(cli_id.clone()),
+                        );
+                    }
+                    None => {
+                        tracing::warn!(
+                            target: "uta",
+                            account = %self.state.account_id,
+                            cli_id = %cli_id,
+                            "PlaceOrder.order is not a JSON object; clientOrderId injection skipped"
+                        );
+                    }
                 }
             }
         }
-        // Replace the staging area with the cli-id-injected operations before push.
-        self.state
-            .git
-            .replace_staging_area(ops_with_cli_ids.clone());
 
         // Step 1: record intent (fsync) — captures operations + client_order_ids.
+        // Issue 2 fix: record_intent is the point of no return. replace_staging_area must come
+        // AFTER this succeeds so that a disk-full failure here does not leave the staging area
+        // mutated with cli-ids but without a backing journal entry.
         let intent = ExecutionIntent {
             commit_hash: pending_hash.clone(),
-            client_order_ids: client_order_ids.clone(),
+            client_order_ids,
             operations: ops_with_cli_ids.clone(),
             started_at: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
             broker_id: self.state.account_id.clone(),
         };
         let handle = self.state.journal.record_intent(intent).await?;
+
+        // Replace the staging area with the cli-id-injected operations.
+        // Safe to mutate state here — the journal entry now exists on disk.
+        self.state.git.replace_staging_area(ops_with_cli_ids);
 
         // Step 2: broker calls via TradingGit push_with_dispatcher.
         let broker = self.state.broker.clone();
@@ -264,7 +280,20 @@ impl UtaActor {
         }
 
         // Step 5: close journal entry — move executing/<hash>.json → done/<hash>.json.
-        self.state.journal.close(handle).await?;
+        // Issue 1 fix: close failure is recoverable. By the time we reach this step the commit
+        // is on disk and positions are updated; propagating the error would block the
+        // CommitNotify event and strand the entry in executing/ unnecessarily. Task D's
+        // reconciler handles stranded entries. This mirrors the persist-error swallow pattern
+        // used in Step 4.
+        if let Err(e) = self.state.journal.close(handle).await {
+            tracing::warn!(
+                target: "uta",
+                account = %self.state.account_id,
+                hash = %pending_hash,
+                error = %e,
+                "journal close failed after successful push (entry stranded in executing/, reconciler will recover)"
+            );
+        }
 
         // Emit commit.notify event if subscribed.
         // BACK-PRESSURE NOTE: send().await blocks the actor if the consumer is slow
