@@ -5,6 +5,7 @@ import { readFile, rm } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import Decimal from 'decimal.js'
 import { Order, OrderState } from '@traderalice/ibkr'
+import { BrokerError } from '../brokers/types.js'
 import { UnifiedTradingAccount } from '../UnifiedTradingAccount.js'
 import type { UnifiedTradingAccountOptions } from '../UnifiedTradingAccount.js'
 import { MockBroker, makeContract, makePosition, makeOpenOrder } from '../brokers/mock/index.js'
@@ -617,7 +618,9 @@ describe('UTA — post-push/reject hooks', () => {
     uta.git.add({ action: 'placeOrder', contract: makeContract(), order: new Order() })
     uta.git.commit('buy')
 
-    await expect(uta.push()).rejects.toThrow()
+    const err = await uta.push().catch((e) => e)
+    expect(err).toBeInstanceOf(BrokerError)
+    expect(err.code).toBe('CONFIG')
     expect(onPostPush).not.toHaveBeenCalled()
   })
 
