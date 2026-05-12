@@ -25,7 +25,7 @@
  * Run: pnpm tsx parity/check-uta-concurrency.ts
  */
 
-import { Contract, Order } from '@traderalice/ibkr'
+import { Contract, Order } from '@traderalice/ibkr-types'
 import Decimal from 'decimal.js'
 import type {
   IBroker,
@@ -38,7 +38,7 @@ import type {
   AccountCapabilities,
 } from '../src/domain/trading/brokers/types.js'
 import { UnifiedTradingAccount } from '../src/domain/trading/UnifiedTradingAccount.js'
-import type { ContractDescription, ContractDetails } from '@traderalice/ibkr'
+import type { ContractDescription, ContractDetails } from '@traderalice/ibkr-types'
 import { classifyCommit, verifyCommit } from '../src/domain/trading/git/persisted-commit.js'
 import { rehydrateOperation } from '../src/domain/trading/git/_rehydrate.js'
 

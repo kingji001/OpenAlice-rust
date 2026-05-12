@@ -34,7 +34,7 @@ import { RustUtaProxy } from '../src/domain/trading/unified-trading-account-rust
 import { BrokerError } from '../src/domain/trading/brokers/types.js'
 import { UnifiedTradingAccount } from '../src/domain/trading/UnifiedTradingAccount.js'
 import { MockBroker, makeContract } from '../src/domain/trading/brokers/mock/index.js'
-import { Order } from '@traderalice/ibkr'
+import { Order } from '@traderalice/ibkr-types'
 import type { UTAConfig } from '../src/core/config.js'
 import type { TradingCore as TradingCoreType } from '@traderalice/trading-core-bindings'
 

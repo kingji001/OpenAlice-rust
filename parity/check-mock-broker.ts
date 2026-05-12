@@ -13,7 +13,7 @@
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { Contract, Order } from '@traderalice/ibkr'
+import { Contract, Order } from '@traderalice/ibkr-types'
 import Decimal from 'decimal.js'
 import { canonicalJson } from '../src/domain/trading/canonical-json.js'
 import { MockBroker } from '../src/domain/trading/brokers/mock/MockBroker.js'

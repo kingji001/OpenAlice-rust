@@ -20,7 +20,7 @@ import { readFile, readdir, mkdir, writeFile, rm } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { createHash } from 'node:crypto'
 import Decimal from 'decimal.js'
-import { Order, Contract } from '@traderalice/ibkr'
+import { Order, Contract } from '@traderalice/ibkr-types'
 
 function sha8(s: string): string {
   return createHash('sha256').update(s).digest('hex').slice(0, 8)

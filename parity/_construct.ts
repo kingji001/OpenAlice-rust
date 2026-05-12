@@ -10,7 +10,7 @@
 
 import { TradingGit } from '../src/domain/trading/git/TradingGit.js'
 import type { Operation, OperationResult, GitState } from '../src/domain/trading/git/types.js'
-import { UNSET_DECIMAL } from '@traderalice/ibkr'
+import { UNSET_DECIMAL } from '@traderalice/ibkr-types'
 
 export interface StubPolicy {
   /** Returns the OperationResult for a given Operation about to be executed. */

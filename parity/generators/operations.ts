@@ -20,7 +20,7 @@
 import { mkdir, writeFile, rm } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import Decimal from 'decimal.js'
-import { Order, Contract } from '@traderalice/ibkr'
+import { Order, Contract } from '@traderalice/ibkr-types'
 import { toCanonicalDecimalString } from '../../src/domain/trading/canonical-decimal.js'
 import { canonicalJson, type CanonicalJsonValue } from '../../src/domain/trading/canonical-json.js'
 

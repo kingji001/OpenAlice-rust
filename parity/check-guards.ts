@@ -14,7 +14,7 @@
 
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { resolve, join } from 'node:path'
-import { Contract, Order, UNSET_DECIMAL } from '@traderalice/ibkr'
+import { Contract, Order, UNSET_DECIMAL } from '@traderalice/ibkr-types'
 import Decimal from 'decimal.js'
 import { createGuardPipeline, resolveGuards } from '../src/domain/trading/guards/index.js'
 import type { Operation } from '../src/domain/trading/git/types.js'
