@@ -56,7 +56,10 @@ pub struct TradingCoreEvent {
     pub uta_id: String,
     /// Per-UTA monotonic counter. u32 → JS number (napi-rs v2).
     pub seq: u32,
-    pub timestamp_ms: i64,
+    /// Milliseconds since Unix epoch as f64. napi-rs v2 maps i64 to JS BigInt,
+    /// which breaks TS `number` consumers; f64 maps to JS `number` and safely
+    /// represents all timestamps well past year 2100 (2^53 ms ≈ 285616 years).
+    pub timestamp_ms: f64,
     /// 'commit.notify' | 'reject.notify' | 'account.health'
     pub event_type: String,
     /// Serialized payload — TS parses based on event_type.

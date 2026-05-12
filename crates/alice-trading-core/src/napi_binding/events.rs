@@ -61,7 +61,7 @@ impl EventDispatcher {
         let event = TradingCoreEvent {
             uta_id: uta_id.to_string(),
             seq,
-            timestamp_ms: chrono::Utc::now().timestamp_millis(),
+            timestamp_ms: chrono::Utc::now().timestamp_millis() as f64,
             event_type: event_type.to_string(),
             payload_json,
         };
