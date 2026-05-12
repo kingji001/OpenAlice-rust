@@ -10,7 +10,7 @@ use serde_json::Value;
 
 pub type CommitHash = String;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "action", rename_all = "camelCase")]
 pub enum Operation {
     PlaceOrder {
@@ -62,7 +62,7 @@ pub enum OperationStatus {
     UserRejected,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct OperationResult {
     pub action: String,

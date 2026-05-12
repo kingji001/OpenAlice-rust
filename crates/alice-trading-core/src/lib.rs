@@ -10,6 +10,7 @@ pub mod decimal;
 pub mod git;
 pub mod guards;
 pub mod hash_v2;
+pub mod journal;
 pub mod operation_wire;
 pub mod persisted_commit;
 pub mod types;
