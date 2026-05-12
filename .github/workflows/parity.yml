@@ -55,6 +55,13 @@ jobs:
       - name: napi build (release)
         run: pnpm --filter @traderalice/trading-core-bindings build
 
+      # ---- index.d.ts drift check ----
+      # napi build regenerates index.d.ts in-place. If a developer changed
+      # the napi surface but forgot to commit the regenerated .d.ts, this
+      # step catches it before merge.
+      - name: index.d.ts drift check
+        run: pnpm --filter @traderalice/trading-core-bindings run check-types
+
       # ---- Smoke test ----
       - name: ping smoke test
         run: node -e "console.log(require('./packages/trading-core-bindings').ping())"

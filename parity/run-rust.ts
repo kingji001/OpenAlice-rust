@@ -4,7 +4,8 @@
  *
  * Drives the Rust TradingGit (via napi binding) through the same lifecycle as
  * run-ts.ts --scenario. Outputs canonical JSON of the final GitExportState
- * so that parity/check-git.ts can byte-compare TS vs Rust.
+ * so that parity/check-git.ts can do structural comparison vs the TS runner.
+ * (Live byte parity needs Phase 4d work — see check-git.ts header.)
  *
  * Usage:
  *   pnpm tsx parity/run-rust.ts --scenario=<file> [--emit-git-state=<out>]
