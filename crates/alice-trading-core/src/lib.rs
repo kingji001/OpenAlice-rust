@@ -8,6 +8,7 @@ pub mod brokers;
 pub mod canonical;
 pub mod decimal;
 pub mod git;
+pub mod guards;
 pub mod hash_v2;
 pub mod operation_wire;
 pub mod persisted_commit;
