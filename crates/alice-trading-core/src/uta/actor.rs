@@ -216,6 +216,11 @@ impl UtaActor {
         }
 
         // 6. Emit commit.notify event if subscribed.
+        // BACK-PRESSURE NOTE: send().await blocks the actor if the consumer
+        // is slow and the channel is full. Acceptable for Phase 4d
+        // (in-process tests only). Phase 4f's napi tsfn wiring should
+        // either size the channel appropriately or switch to try_send with
+        // a logged drop on overflow.
         if let Some(tx) = &self.state.event_tx {
             let _ = tx
                 .send(UtaEvent::CommitNotify {

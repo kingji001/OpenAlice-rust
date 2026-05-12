@@ -32,7 +32,8 @@ fn buy_op(symbol: &str) -> Operation {
 async fn full_lifecycle_via_actor_persists_commit() {
     let dir = TempDir::new().unwrap();
     let broker = Arc::new(MockBroker::new(MockBrokerOptions::default()));
-    broker.set_quote("AAPL", 100.0);
+    // Quote keyed on the contract's aliceId (matches position_key derivation).
+    broker.set_quote("mock|AAPL", 100.0);
 
     let state = UtaState::new(
         "lifecycle-1".to_string(),
@@ -93,7 +94,8 @@ async fn commit_emits_event_when_event_tx_set() {
 
     let dir = TempDir::new().unwrap();
     let broker = Arc::new(MockBroker::new(MockBrokerOptions::default()));
-    broker.set_quote("AAPL", 100.0);
+    // Quote keyed on the contract's aliceId (matches position_key derivation).
+    broker.set_quote("mock|AAPL", 100.0);
     let (event_tx, mut event_rx) = mpsc::channel::<UtaEvent>(16);
 
     let mut state = UtaState::new(

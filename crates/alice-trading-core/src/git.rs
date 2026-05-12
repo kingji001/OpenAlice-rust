@@ -163,6 +163,17 @@ impl TradingGit {
     }
 
     pub fn push(&mut self) -> Result<PushResult, String> {
+        let (operations, pending_message, pending_hash) = self.prepare_push()?;
+        let mut results = Vec::with_capacity(operations.len());
+        for op in &operations {
+            results.push((self.config.execute_operation)(op));
+        }
+        Ok(self.finalize_push_commit(operations, results, pending_message, pending_hash))
+    }
+
+    /// Shared prep: validates staging + extracts pending_message/pending_hash.
+    /// Used by both `push` and `push_with_dispatcher`.
+    fn prepare_push(&self) -> Result<(Vec<Operation>, String, String), String> {
         if self.staging_area.is_empty() {
             return Err("Nothing to push: staging area is empty".to_string());
         }
@@ -174,12 +185,19 @@ impl TradingGit {
             .pending_hash
             .clone()
             .ok_or("Nothing to push: please commit first")?;
+        Ok((self.staging_area.clone(), pending_message, pending_hash))
+    }
 
-        let operations = self.staging_area.clone();
-        let mut results = Vec::with_capacity(operations.len());
-        for op in &operations {
-            results.push((self.config.execute_operation)(op));
-        }
+    /// Shared finalization: build GitCommit, push to log, fire on_commit,
+    /// clear pending state, return PushResult. Used by both `push` (sync)
+    /// and `push_with_dispatcher` (async).
+    fn finalize_push_commit(
+        &mut self,
+        operations: Vec<Operation>,
+        results: Vec<OperationResult>,
+        pending_message: String,
+        pending_hash: String,
+    ) -> PushResult {
         let state_after = (self.config.get_git_state)();
 
         // INVARIANT 2: timestamp == hash_input_timestamp for v2 commits.
@@ -225,13 +243,13 @@ impl TradingGit {
         let submitted = results.iter().filter(|r| r.success).cloned().collect();
         let rejected = results.iter().filter(|r| !r.success).cloned().collect();
 
-        Ok(PushResult {
+        PushResult {
             hash: pending_hash,
             message: pending_message,
             operation_count: operations.len() as u32,
             submitted,
             rejected,
-        })
+        }
     }
 
     /// Async push variant — accepts an async dispatcher closure that returns a
@@ -250,19 +268,7 @@ impl TradingGit {
     where
         F: Fn(&Operation) -> Pin<Box<dyn Future<Output = Result<Value, String>> + Send>> + Sync,
     {
-        if self.staging_area.is_empty() {
-            return Err("Nothing to push: staging area is empty".to_string());
-        }
-        let pending_message = self
-            .pending_message
-            .clone()
-            .ok_or("Nothing to push: please commit first")?;
-        let pending_hash = self
-            .pending_hash
-            .clone()
-            .ok_or("Nothing to push: please commit first")?;
-
-        let operations = self.staging_area.clone();
+        let (operations, pending_message, pending_hash) = self.prepare_push()?;
         let mut results: Vec<OperationResult> = Vec::with_capacity(operations.len());
         for op in &operations {
             match dispatcher(op).await {
@@ -281,58 +287,7 @@ impl TradingGit {
                 }),
             }
         }
-
-        let state_after = (self.config.get_git_state)();
-
-        // INVARIANT 2: timestamp == hash_input_timestamp for v2 commits.
-        let timestamp = self
-            .pending_v2
-            .as_ref()
-            .map(|v| v.hash_input_timestamp.clone())
-            .unwrap_or_else(now_iso);
-
-        let commit = GitCommit {
-            hash: pending_hash.clone(),
-            parent_hash: self.head.clone(),
-            message: pending_message.clone(),
-            operations: operations.clone(),
-            results: results.clone(),
-            state_after,
-            timestamp,
-            round: self.current_round,
-            hash_version: self.pending_v2.as_ref().map(|_| 2),
-            intent_full_hash: self.pending_v2.as_ref().map(|v| v.intent_full_hash.clone()),
-            hash_input_timestamp: self
-                .pending_v2
-                .as_ref()
-                .map(|v| v.hash_input_timestamp.clone()),
-            entry_hash_version: None,
-            entry_full_hash: None,
-        };
-
-        self.commits.push(commit);
-        self.head = Some(pending_hash.clone());
-
-        if let Some(cb) = &self.config.on_commit {
-            cb(&self.export_state());
-        }
-
-        // INVARIANT 3: clear pending state at end of push().
-        self.staging_area.clear();
-        self.pending_message = None;
-        self.pending_hash = None;
-        self.pending_v2 = None;
-
-        let submitted = results.iter().filter(|r| r.success).cloned().collect();
-        let rejected = results.iter().filter(|r| !r.success).cloned().collect();
-
-        Ok(PushResult {
-            hash: pending_hash,
-            message: pending_message,
-            operation_count: operations.len() as u32,
-            submitted,
-            rejected,
-        })
+        Ok(self.finalize_push_commit(operations, results, pending_message, pending_hash))
     }
 
     pub fn reject(&mut self, reason: Option<String>) -> Result<RejectResult, String> {
