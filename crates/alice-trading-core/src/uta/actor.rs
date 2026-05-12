@@ -53,7 +53,7 @@ impl UtaActor {
             signal_tx: sig_tx,
             state,
         };
-        let join = tokio::spawn(actor.run());
+        let join = tokio::spawn(actor.run_with_reconciliation());
         (
             UtaHandle {
                 account_id,
@@ -61,6 +61,39 @@ impl UtaActor {
             },
             join,
         )
+    }
+
+    async fn run_with_reconciliation(mut self) {
+        // Reconcile any pending journal entries from a previous run
+        match crate::journal::reconcile::reconcile_journal(
+            &self.state.journal,
+            &self.state.broker,
+            &mut self.state.git,
+            &self.state.account_id,
+            &self.state.data_root,
+        )
+        .await
+        {
+            Ok(outcomes) => {
+                if !outcomes.is_empty() {
+                    tracing::info!(
+                        target: "uta",
+                        account = %self.state.account_id,
+                        outcome_count = outcomes.len(),
+                        "reconciled pending journal entries"
+                    );
+                }
+            }
+            Err(e) => {
+                tracing::error!(
+                    target: "uta",
+                    account = %self.state.account_id,
+                    error = %e,
+                    "reconciliation failed at startup; continuing"
+                );
+            }
+        }
+        self.run().await
     }
 
     pub async fn run(mut self) {
