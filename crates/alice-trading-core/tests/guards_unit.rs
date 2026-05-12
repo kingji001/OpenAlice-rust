@@ -177,8 +177,10 @@ async fn max_position_size_rejects_over_limit() {
     let rejection = g.check(&ctx).await;
     assert!(rejection.is_some());
     let msg = rejection.unwrap();
+    // TS template literal renders integer 25 as "25" (no decimal),
+    // unlike toFixed(1) which forces "30.0" for the percent.
     assert_eq!(
-        msg, "Position for AAPL would be 30.0% of equity (limit: 25.0%)",
+        msg, "Position for AAPL would be 30.0% of equity (limit: 25%)",
         "rejection string must match TS exact format",
     );
 }

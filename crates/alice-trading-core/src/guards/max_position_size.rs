@@ -107,7 +107,7 @@ impl Guard for MaxPositionSizeGuard {
                 "Position for {} would be {}% of equity (limit: {}%)",
                 symbol,
                 format_percent(&percent),
-                format_percent(&self.max_percent),
+                self.max_percent,
             ));
         }
         None
