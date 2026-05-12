@@ -83,6 +83,24 @@ export interface TaskErrorPayload {
   durationMs: number
 }
 
+export interface CommitNotifyPayload {
+  accountId: string
+  commitHash: string
+}
+
+export interface RejectNotifyPayload {
+  accountId: string
+  commitHash: string
+  reason: string
+}
+
+export interface AccountHealthPayload {
+  accountId: string
+  status: 'healthy' | 'degraded' | 'offline'
+  consecutiveFailures: number
+  nextRecoveryAt?: string
+}
+
 // ==================== Event Map ====================
 
 // Import the actual CronFirePayload type for use in the map
@@ -100,6 +118,9 @@ export interface AgentEventMap {
   'task.requested': TaskRequestedPayload
   'task.done': TaskDonePayload
   'task.error': TaskErrorPayload
+  'commit.notify': CommitNotifyPayload
+  'reject.notify': RejectNotifyPayload
+  'account.health': AccountHealthPayload
 }
 
 // ==================== TypeBox Schemas ====================
@@ -171,6 +192,24 @@ const TaskErrorSchema = Type.Object({
   durationMs: Type.Number(),
 })
 
+const CommitNotifyPayloadSchema = Type.Object({
+  accountId: Type.String(),
+  commitHash: Type.String(),
+})
+
+const RejectNotifyPayloadSchema = Type.Object({
+  accountId: Type.String(),
+  commitHash: Type.String(),
+  reason: Type.String(),
+})
+
+const AccountHealthPayloadSchema = Type.Object({
+  accountId: Type.String(),
+  status: Type.Union([Type.Literal('healthy'), Type.Literal('degraded'), Type.Literal('offline')]),
+  consecutiveFailures: Type.Number(),
+  nextRecoveryAt: Type.Optional(Type.String()),
+})
+
 // ==================== AgentEvents — metadata registry ====================
 
 export interface AgentEventMeta {
@@ -230,6 +269,18 @@ export const AgentEvents: { [K in keyof AgentEventMap]: AgentEventMeta } = {
   'task.error': {
     schema: TaskErrorSchema,
     description: 'A requested task failed during execution.',
+  },
+  'commit.notify': {
+    schema: CommitNotifyPayloadSchema,
+    description: 'Fires after a UTA push succeeds and the commit is persisted.',
+  },
+  'reject.notify': {
+    schema: RejectNotifyPayloadSchema,
+    description: 'Fires when a UTA push is rejected by guards or broker.',
+  },
+  'account.health': {
+    schema: AccountHealthPayloadSchema,
+    description: 'Fires on UTA broker-health transition (healthy ↔ degraded ↔ offline).',
   },
 }
 

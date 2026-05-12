@@ -287,11 +287,48 @@ export const utaConfigSchema = z.object({
   guards: z.array(guardConfigSchema).default([]),
   /** User-filled form values, validated against the preset's own zodSchema. */
   presetConfig: z.record(z.string(), z.unknown()).default({}),
+  /**
+   * Per-account broker implementation override. When present, overrides the
+   * global default from `tradingCoreConfigSchema.defaultBrokerImpl[type]`.
+   * Most accounts leave this unset and inherit the global default.
+   */
+  brokerImpl: z.enum(['ts', 'rust']).optional(),
 })
 
 export const utasFileSchema = z.array(utaConfigSchema)
 
 export type UTAConfig = z.infer<typeof utaConfigSchema>
+
+// ==================== Trading Core Config ====================
+
+/**
+ * Global trading-core configuration — controls which broker implementation
+ * (TS vs Rust) is used by default, event queue sizing, and panic thresholds.
+ * Read from `data/config/trading-core.json`; all fields have safe defaults.
+ */
+export const tradingCoreConfigSchema = z.object({
+  defaultBrokerImpl: z.object({
+    alpaca: z.enum(['ts', 'rust']).default('ts'),
+    ibkr: z.enum(['ts', 'rust']).default('ts'),
+    ccxt: z.literal('ts').default('ts'),  // pinned to TS — never migrates
+    mock: z.enum(['ts', 'rust']).default('rust'),
+  }).default({ alpaca: 'ts', ibkr: 'ts', ccxt: 'ts', mock: 'rust' }),
+  eventQueueCapacity: z.number().int().positive().default(1024),
+  panicDisableThreshold: z.number().int().positive().default(5),
+  dataRoot: z.string().default('./data'),
+})
+
+export type TradingCoreConfig = z.infer<typeof tradingCoreConfigSchema>
+
+/** Load trading-core config from disk; falls back to schema defaults if absent. */
+export async function loadTradingCoreConfig(): Promise<TradingCoreConfig> {
+  try {
+    const raw = JSON.parse(await readFile(resolve(CONFIG_DIR, 'trading-core.json'), 'utf-8'))
+    return tradingCoreConfigSchema.parse(raw)
+  } catch {
+    return tradingCoreConfigSchema.parse({})
+  }
+}
 
 // ==================== Unified Config Type ====================
 

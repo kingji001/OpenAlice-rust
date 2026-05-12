@@ -10,6 +10,7 @@ describe('AgentEventSchemas', () => {
     'heartbeat.done', 'heartbeat.skip', 'heartbeat.error',
     'message.received', 'message.sent',
     'task.requested', 'task.done', 'task.error',
+    'commit.notify', 'reject.notify', 'account.health',
   ]
 
   it('should have a schema for every key in AgentEventMap', () => {
