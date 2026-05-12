@@ -464,7 +464,7 @@ export class UnifiedTradingAccount {
       throw new BrokerError('CONFIG', `Account "${this.label}" is disabled due to configuration error.`)
     }
     if (this.health === 'offline') {
-      throw new Error(`Account "${this.label}" is offline. Cannot execute trades.`)
+      throw new BrokerError('NETWORK', `Account "${this.label}" is offline. Cannot execute trades.`)
     }
     const result = await this.git.push()
     Promise.resolve(this._onPostPush?.(this.id)).catch(() => {})

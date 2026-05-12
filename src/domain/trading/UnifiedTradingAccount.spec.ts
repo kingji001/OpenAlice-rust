@@ -5,6 +5,7 @@ import { UnifiedTradingAccount } from './UnifiedTradingAccount.js'
 import type { UnifiedTradingAccountOptions } from './UnifiedTradingAccount.js'
 import { MockBroker, makeContract, makePosition, makeOpenOrder } from './brokers/mock/index.js'
 import type { Operation } from './git/types.js'
+import { BrokerError } from './brokers/types.js'
 import './contract-ext.js'
 
 function createUTA(broker?: MockBroker, options?: UnifiedTradingAccountOptions): { uta: UnifiedTradingAccount; broker: MockBroker } {
@@ -712,7 +713,10 @@ describe('UTA — health tracking', () => {
 
     await uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
     await uta.commit('buy AAPL')
-    await expect(uta.push()).rejects.toThrow(/offline/)
+    const err = await uta.push().catch((e) => e)
+    expect(err).toBeInstanceOf(BrokerError)
+    expect(err.code).toBe('NETWORK')
+    expect(err.message).toMatch(/offline/)
     await uta.close()
   })
 
