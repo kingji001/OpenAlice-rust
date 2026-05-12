@@ -10,6 +10,12 @@ export type {
   AccountCapabilities,
   BrokerConfigField,
   TpSlParams,
+  // Margin trading types (Cross Margin / Binance pivot)
+  MarginAccount,
+  MarginAsset,
+  MarginOrderParams,
+  FundingTransfer,
+  MarginOperationResult,
 } from './types.js'
 
 // Factory

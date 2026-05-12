@@ -59,6 +59,82 @@ export class BrokerError extends Error {
   }
 }
 
+// ==================== Cross Margin types ====================
+
+/**
+ * Cross Margin account snapshot from a broker that supports margin trading.
+ * All asset values are in BTC equivalent per Binance API convention.
+ */
+export interface MarginAccount {
+  /** Total collateral value in BTC equivalent */
+  totalAssetBtc: string
+  /** Total borrowed in BTC equivalent (principal only, excludes interest) */
+  totalLiabilityBtc: string
+  /** totalAssetBtc - totalLiabilityBtc */
+  totalNetAssetBtc: string
+  /** Binance "margin ratio": totalAssetBtc / (totalLiabilityBtc + outstandingInterest). Higher is safer. */
+  marginLevel: string
+  /** Can this account borrow? */
+  borrowEnabled: boolean
+  /** Can funds be transferred to/from this account? */
+  transferEnabled: boolean
+  /** Can this account place orders? */
+  tradeEnabled: boolean
+}
+
+/**
+ * One asset's balance + borrow state in a Cross Margin account.
+ */
+export interface MarginAsset {
+  asset: string
+  /** Available balance (not in orders, not borrowed against) */
+  free: string
+  /** Locked in open orders */
+  locked: string
+  /** Outstanding loan principal */
+  borrowed: string
+  /** Accrued interest on the loan */
+  interest: string
+  /** free + locked - borrowed - interest */
+  netAsset: string
+}
+
+/**
+ * Per-order parameters for margin trading. When set, the order is routed
+ * through the margin endpoint instead of spot.
+ */
+export interface MarginOrderParams {
+  /**
+   * - 'NO_SIDE_EFFECT' (default): margin order without auto-borrow or auto-repay
+   * - 'MARGIN_BUY': auto-borrow the quote asset to fund the buy
+   * - 'AUTO_REPAY': auto-repay the loan with proceeds when the order fills
+   */
+  sideEffectType?: 'NO_SIDE_EFFECT' | 'MARGIN_BUY' | 'AUTO_REPAY'
+  /** Cross Margin = false (pivot default). Isolated Margin = true. */
+  isIsolated?: boolean
+  /** If true, repay any outstanding loan on this asset when the order is cancelled. */
+  autoRepayAtCancel?: boolean
+}
+
+/**
+ * Funds transfer between Spot Wallet and Cross Margin Wallet.
+ */
+export interface FundingTransfer {
+  type: 'SPOT_TO_CROSS_MARGIN' | 'CROSS_MARGIN_TO_SPOT'
+  asset: string
+  amount: string
+}
+
+/**
+ * Result of a margin-related operation that returns a transaction reference.
+ */
+export interface MarginOperationResult {
+  /** Broker-issued transaction ID */
+  txId: string
+  /** Broker-issued client-side ID echoed back (matches the journal's client_order_id) */
+  clientOrderId?: string
+}
+
 // ==================== Position ====================
 
 /**
@@ -88,6 +164,18 @@ export interface Position {
    * shares"), not a math input. Consumers must NOT re-apply.
    */
   multiplier?: string
+  /**
+   * Margin-specific metadata. Undefined for spot positions; populated for
+   * positions held in a Cross Margin account.
+   */
+  marginMetadata?: {
+    /** Amount borrowed against this position's asset (principal) */
+    borrowed: string
+    /** Accrued interest on the borrow */
+    interest: string
+    /** Snapshot of the account's margin level at position read time */
+    marginLevel: string
+  }
 }
 
 // ==================== Order result ====================
@@ -266,4 +354,34 @@ export interface IBroker<TMeta = unknown> {
   /** Reconstruct a trade-ready contract from a nativeKey (for aliceId resolution).
    *  Broker fills in secType, exchange, currency, conId, etc. as needed. */
   resolveNativeKey(nativeKey: string): Contract
+
+  // ---- Margin trading (optional — only implemented by margin-capable brokers) ----
+
+  /**
+   * Get the margin account snapshot. Optional — only implemented by brokers
+   * that support margin trading (CCXT with marginType='cross').
+   */
+  getMarginAccount?(): Promise<MarginAccount>
+
+  /**
+   * List all margin assets with their borrow/free/locked state.
+   */
+  getMarginAssets?(): Promise<MarginAsset[]>
+
+  /**
+   * Borrow an asset against the margin account's collateral.
+   * @param asset - e.g., 'USDT'
+   * @param amount - quantity to borrow, as a string (broker-canonical decimal)
+   */
+  borrow?(asset: string, amount: string): Promise<MarginOperationResult>
+
+  /**
+   * Repay a borrowed amount.
+   */
+  repay?(asset: string, amount: string): Promise<MarginOperationResult>
+
+  /**
+   * Transfer funds between Spot Wallet and Cross Margin Wallet.
+   */
+  transferFunding?(op: FundingTransfer): Promise<MarginOperationResult>
 }
