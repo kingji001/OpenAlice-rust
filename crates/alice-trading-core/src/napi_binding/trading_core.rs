@@ -117,6 +117,11 @@ impl TradingCore {
                 UtaState::restore_or_new(account_config.id.clone(), broker, guards, data_root)
                     .await;
 
+            // Propagate the AccountConfig.enabled flag to health.disabled so a
+            // disabled account rejects pushes with BrokerError(CONFIG) per the
+            // TS UTA semantics (mirrors UnifiedTradingAccount._doPush() check).
+            state.health.disabled = !account_config.enabled;
+
             // Build the event channel that the actor will write to.
             let (uta_event_tx, mut uta_event_rx) = mpsc::channel::<UtaEvent>(64);
             state.event_tx = Some(uta_event_tx);
