@@ -1,0 +1,75 @@
+name: Phase 3 Parity
+
+on:
+  push:
+    branches: [master, dev]
+  pull_request:
+    branches: [master]
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ---- Rust toolchain ----
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Rust target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      # ---- Node / pnpm ----
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ---- Rust checks ----
+      - name: cargo test (no napi-binding feature)
+        run: cargo test -p alice-trading-core
+
+      - name: cargo clippy
+        run: cargo clippy -p alice-trading-core --all-targets -- -D warnings
+
+      - name: cargo fmt check
+        run: cargo fmt -p alice-trading-core --check
+
+      # ---- Build napi binding ----
+      - name: napi build (release)
+        run: pnpm --filter @traderalice/trading-core-bindings build
+
+      # ---- Smoke test ----
+      - name: ping smoke test
+        run: node -e "console.log(require('./packages/trading-core-bindings').ping())"
+
+      # ---- Parity scripts ----
+      - name: check-canonical-decimal-rust
+        run: pnpm tsx parity/check-canonical-decimal-rust.ts
+
+      - name: check-git (TS vs Rust parity)
+        run: pnpm tsx parity/check-git.ts
+
+      # ---- TypeScript ----
+      - name: tsc type check
+        run: npx tsc --noEmit
+
+      # ---- TS tests ----
+      - name: pnpm test
+        run: pnpm test

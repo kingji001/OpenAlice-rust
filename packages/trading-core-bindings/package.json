@@ -1,0 +1,23 @@
+{
+  "name": "@traderalice/trading-core-bindings",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": ["index.js", "index.d.ts", "*.node"],
+  "napi": {
+    "name": "trading-core-bindings",
+    "triples": {
+      "defaults": true,
+      "additional": []
+    }
+  },
+  "scripts": {
+    "build": "napi build --platform --release --js false --dts index.d.ts --features napi-binding --cargo-cwd ../../crates/alice-trading-core",
+    "build:debug": "napi build --platform --js false --dts index.d.ts --features napi-binding --cargo-cwd ../../crates/alice-trading-core",
+    "check-types": "git diff --exit-code -- index.d.ts || (echo 'index.d.ts drift — regenerate and commit'; exit 1)"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.0"
+  }
+}
