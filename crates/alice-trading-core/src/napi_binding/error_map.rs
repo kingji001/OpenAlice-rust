@@ -13,13 +13,27 @@ use crate::brokers::error::BrokerError;
 /// BROKER_ERROR:{"code":"NETWORK","message":"...","permanent":false,"broker":null,"details_json":null}
 /// ```
 ///
+/// `code` uses the canonical serde representation (`SCREAMING_SNAKE_CASE`, matching
+/// `BrokerErrorCode`'s `#[serde(rename_all = "SCREAMING_SNAKE_CASE")]`), NOT the
+/// Debug format. This ensures TS-side reconstruction (`setPrototypeOf`) sees
+/// "NETWORK" rather than "Network".
+///
+/// `broker` and `details_json` are Phase 4f stubs emitted as `null`. Phase 6
+/// will plumb the source broker name and a structured details payload.
+///
 /// The TypeScript `RustUtaProxy._call()` strips the prefix, parses the JSON,
 /// and uses `Object.setPrototypeOf` to reconstruct a `BrokerError` instance.
 pub fn broker_error_to_napi(e: BrokerError) -> napi::Error {
+    let code_str = serde_json::to_value(e.code)
+        .ok()
+        .and_then(|v| v.as_str().map(String::from))
+        .unwrap_or_else(|| format!("{:?}", e.code)); // fallback only
     let encoded = serde_json::json!({
-        "code": format!("{:?}", e.code),
+        "code": code_str,
         "message": e.message,
         "permanent": e.permanent,
+        "broker": Option::<String>::None,        // null — Phase 6 will plumb source broker
+        "details_json": Option::<String>::None,  // null — reserved for future details payload
     });
     napi::Error::new(
         napi::Status::GenericFailure,
@@ -61,9 +75,16 @@ mod tests {
         let msg = napi_err.reason;
         let json_str = msg.strip_prefix("BROKER_ERROR:").unwrap();
         let parsed: serde_json::Value = serde_json::from_str(json_str).expect("valid JSON");
-        assert_eq!(parsed["code"], "Config");
+        // code must use serde SCREAMING_SNAKE_CASE, not Debug PascalCase
+        assert_eq!(parsed["code"], "CONFIG");
         assert_eq!(parsed["message"], "disabled");
         assert_eq!(parsed["permanent"], true);
+        // Phase 4f stubs: broker and details_json must be present and null
+        assert!(parsed["broker"].is_null(), "broker should be null");
+        assert!(
+            parsed["details_json"].is_null(),
+            "details_json should be null"
+        );
     }
 
     #[test]
@@ -73,6 +94,20 @@ mod tests {
         let json_str = napi_err.reason.strip_prefix("BROKER_ERROR:").unwrap();
         let parsed: serde_json::Value = serde_json::from_str(json_str).unwrap();
         assert_eq!(parsed["permanent"], false);
+        // SCREAMING_SNAKE_CASE for Network
+        assert_eq!(parsed["code"], "NETWORK");
+        // Stubs present and null
+        assert!(parsed["broker"].is_null());
+        assert!(parsed["details_json"].is_null());
+    }
+
+    #[test]
+    fn broker_error_market_closed_code_is_screaming_snake_case() {
+        let e = BrokerError::new(BrokerErrorCode::MarketClosed, "closed");
+        let napi_err = broker_error_to_napi(e);
+        let json_str = napi_err.reason.strip_prefix("BROKER_ERROR:").unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(json_str).unwrap();
+        assert_eq!(parsed["code"], "MARKET_CLOSED");
     }
 
     #[test]

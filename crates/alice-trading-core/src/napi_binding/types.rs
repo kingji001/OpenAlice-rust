@@ -218,3 +218,28 @@ pub struct BrokerHealthInfoNapi {
     /// u32 → JS number (napi-rs v2).
     pub consecutive_failures: Option<u32>,
 }
+
+/// Account snapshot derived from the latest commit's `state_after` in `GitExportState`.
+/// All decimal fields are strings (precision-safe passthrough).
+///
+/// Phase 4f: derived from `export_state()` — no UtaCommand extensions needed.
+#[napi(object)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AccountSnapshotNapi {
+    pub net_liquidation: String,
+    pub total_cash_value: String,
+    pub unrealized_pn_l: String,
+    pub realized_pn_l: String,
+}
+
+/// A single position from the latest commit's `state_after.positions`.
+///
+/// `position_json` is the broker-shape position object serialized to a JSON string.
+/// This matches `GitState.positions: Vec<Value>` — the shape is broker-specific and
+/// is passed through opaquely to the TS host.
+#[napi(object)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PositionSnapshotNapi {
+    /// Serialized broker-shape position object.
+    pub position_json: String,
+}

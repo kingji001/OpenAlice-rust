@@ -21,9 +21,10 @@ use crate::napi_binding::error_map::{
 use crate::napi_binding::panic::async_catch_unwind_napi;
 use crate::napi_binding::trading_core::TradingCore;
 use crate::napi_binding::types::{
-    AddResultNapi, BrokerHealthInfoNapi, CommitPrepareResultNapi, GitExportStateNapi,
-    OperationResultNapi, OrderStatusUpdateNapi, PushResultNapi, RejectResultNapi,
-    StageClosePositionParams, StageModifyOrderParams, StagePlaceOrderParams, SyncResultNapi,
+    AccountSnapshotNapi, AddResultNapi, BrokerHealthInfoNapi, CommitPrepareResultNapi,
+    GitExportStateNapi, OperationResultNapi, OrderStatusUpdateNapi, PositionSnapshotNapi,
+    PushResultNapi, RejectResultNapi, StageClosePositionParams, StageModifyOrderParams,
+    StagePlaceOrderParams, SyncResultNapi,
 };
 use crate::types::{GitState, Operation, OperationStatus, OrderStatusUpdate};
 
@@ -405,6 +406,65 @@ impl TradingCore {
         async_catch_unwind_napi(&uta_id_for_wrap, async move {
             let handle = self.handle_for(&uta_id)?;
             handle.nudge_recovery().await.map_err(string_error_to_napi)
+        })
+        .await
+    }
+
+    // -----------------------------------------------------------------------
+    // Account + position snapshots (D2 — derived from export_state)
+    // -----------------------------------------------------------------------
+
+    /// Return the account snapshot from the latest commit's `state_after`.
+    ///
+    /// Derives from `export_state()` — no UtaCommand extension needed.
+    /// If there are no commits yet, all fields are "0".
+    #[napi]
+    pub async fn get_account(&self, uta_id: String) -> napi::Result<AccountSnapshotNapi> {
+        let uta_id_for_wrap = uta_id.clone();
+        async_catch_unwind_napi(&uta_id_for_wrap, async move {
+            let handle = self.handle_for(&uta_id)?;
+            let state = handle.export_state().await.map_err(string_error_to_napi)?;
+            let snapshot = state.commits.last().map(|c| &c.state_after);
+            Ok(match snapshot {
+                Some(s) => AccountSnapshotNapi {
+                    net_liquidation: s.net_liquidation.clone(),
+                    total_cash_value: s.total_cash_value.clone(),
+                    unrealized_pn_l: s.unrealized_pn_l.clone(),
+                    realized_pn_l: s.realized_pn_l.clone(),
+                },
+                None => AccountSnapshotNapi {
+                    net_liquidation: "0".into(),
+                    total_cash_value: "0".into(),
+                    unrealized_pn_l: "0".into(),
+                    realized_pn_l: "0".into(),
+                },
+            })
+        })
+        .await
+    }
+
+    /// Return positions from the latest commit's `state_after.positions`.
+    ///
+    /// Derives from `export_state()` — no UtaCommand extension needed.
+    /// Each position is serialized to an opaque JSON string (broker-shape passthrough).
+    /// Returns an empty list if there are no commits yet.
+    #[napi]
+    pub async fn get_positions(&self, uta_id: String) -> napi::Result<Vec<PositionSnapshotNapi>> {
+        let uta_id_for_wrap = uta_id.clone();
+        async_catch_unwind_napi(&uta_id_for_wrap, async move {
+            let handle = self.handle_for(&uta_id)?;
+            let state = handle.export_state().await.map_err(string_error_to_napi)?;
+            let positions = state
+                .commits
+                .last()
+                .map(|c| c.state_after.positions.clone())
+                .unwrap_or_default();
+            Ok(positions
+                .into_iter()
+                .map(|p| PositionSnapshotNapi {
+                    position_json: serde_json::to_string(&p).unwrap_or_default(),
+                })
+                .collect())
         })
         .await
     }
