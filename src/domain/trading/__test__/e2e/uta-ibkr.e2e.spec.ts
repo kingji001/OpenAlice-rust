@@ -44,7 +44,7 @@ describe('UTA — IBKR order lifecycle', () => {
     console.log(`  resolved: nativeKey=${nativeKey}, aliceId=${aliceId}`)
 
     // Stage a limit buy at $1 (won't fill)
-    const addResult = uta!.stagePlaceOrder({
+    const addResult = await uta!.stagePlaceOrder({
       aliceId,
       symbol: 'AAPL',
       action: 'BUY',
@@ -55,7 +55,7 @@ describe('UTA — IBKR order lifecycle', () => {
     })
     expect(addResult.staged).toBe(true)
 
-    const commitResult = uta!.commit('e2e: limit buy 1 AAPL @ $1')
+    const commitResult = await uta!.commit('e2e: limit buy 1 AAPL @ $1')
     expect(commitResult.prepared).toBe(true)
     console.log(`  committed: hash=${commitResult.hash}`)
 
@@ -68,8 +68,8 @@ describe('UTA — IBKR order lifecycle', () => {
     const orderId = pushResult.submitted[0].orderId!
 
     // Cancel the order
-    uta!.stageCancelOrder({ orderId })
-    uta!.commit('e2e: cancel limit order')
+    await uta!.stageCancelOrder({ orderId })
+    await uta!.commit('e2e: cancel limit order')
     const cancelPush = await uta!.push()
     console.log(`  cancel pushed: submitted=${cancelPush.submitted.length}, status=${cancelPush.submitted[0]?.status}`)
     expect(cancelPush.submitted).toHaveLength(1)
@@ -90,13 +90,13 @@ describe('UTA — IBKR TPSL pass-through', () => {
     const aliceId = `${uta!.id}|${nativeKey}`
 
     // Stage limit order with TPSL — IBKR ignores tpsl but it should not error
-    uta!.stagePlaceOrder({
+    await uta!.stagePlaceOrder({
       aliceId, symbol: 'AAPL', action: 'BUY', orderType: 'LMT',
       lmtPrice: '1.00', totalQuantity: '1', tif: 'GTC',
       takeProfit: { price: '300' },
       stopLoss: { price: '100' },
     })
-    uta!.commit('e2e: IBKR limit with TPSL (ignored)')
+    await uta!.commit('e2e: IBKR limit with TPSL (ignored)')
     const pushResult = await uta!.push()
     console.log(`  pushed with TPSL: submitted=${pushResult.submitted.length}, status=${pushResult.submitted[0]?.status}`)
     expect(pushResult.submitted).toHaveLength(1)
@@ -104,8 +104,8 @@ describe('UTA — IBKR TPSL pass-through', () => {
 
     // Clean up
     const orderId = pushResult.submitted[0].orderId!
-    uta!.stageCancelOrder({ orderId })
-    uta!.commit('e2e: cancel TPSL order')
+    await uta!.stageCancelOrder({ orderId })
+    await uta!.commit('e2e: cancel TPSL order')
     await uta!.push()
   }, 30_000)
 })
@@ -130,7 +130,7 @@ describe('UTA — IBKR fill flow (AAPL)', () => {
     console.log(`  initial AAPL qty=${initialAaplQty}`)
 
     // === Stage + Commit + Push: buy 1 AAPL ===
-    const addResult = uta!.stagePlaceOrder({
+    const addResult = await uta!.stagePlaceOrder({
       aliceId,
       symbol: 'AAPL',
       action: 'BUY',
@@ -139,7 +139,7 @@ describe('UTA — IBKR fill flow (AAPL)', () => {
     })
     expect(addResult.staged).toBe(true)
 
-    const commitResult = uta!.commit('e2e: buy 1 AAPL')
+    const commitResult = await uta!.commit('e2e: buy 1 AAPL')
     expect(commitResult.prepared).toBe(true)
     console.log(`  committed: hash=${commitResult.hash}`)
 
@@ -168,8 +168,8 @@ describe('UTA — IBKR fill flow (AAPL)', () => {
     // === Close 1 AAPL ===
     // Wait for TWS to update positions after the buy fill
     await new Promise(r => setTimeout(r, 3000))
-    uta!.stageClosePosition({ aliceId, qty: '1' })
-    uta!.commit('e2e: close 1 AAPL')
+    await uta!.stageClosePosition({ aliceId, qty: '1' })
+    await uta!.commit('e2e: close 1 AAPL')
     const closePush = await uta!.push()
     console.log(`  close pushed: status=${closePush.submitted[0]?.status}`)
     expect(closePush.submitted).toHaveLength(1)

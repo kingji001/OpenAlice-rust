@@ -28,6 +28,7 @@ import type {
   SyncResult,
 } from './git/types.js'
 import { createGuardPipeline, resolveGuards } from './guards/index.js'
+import { TsUtaActor } from './uta-actor.js'
 import './contract-ext.js'
 
 // ==================== Options ====================
@@ -97,6 +98,7 @@ export class UnifiedTradingAccount {
   readonly broker: IBroker
   readonly git: TradingGit
 
+  private readonly actor: TsUtaActor
   private readonly _getState: () => Promise<GitState>
   private readonly _onHealthChange?: (accountId: string, health: BrokerHealthInfo) => void
   private readonly _onPostPush?: (accountId: string) => void | Promise<void>
@@ -183,6 +185,7 @@ export class UnifiedTradingAccount {
     p.catch(() => {})
     this._connectPromise = p
 
+    this.actor = new TsUtaActor(this)
   }
 
   /** Await initial broker connection. Resolves on success, rejects on failure. */
@@ -288,6 +291,12 @@ export class UnifiedTradingAccount {
 
   /** Nudge the recovery loop to retry immediately (e.g., when a data request finds this UTA offline). */
   nudgeRecovery(): void {
+    // Note: returns void synchronously; we don't await actor.send for
+    // backward-compat. The command still queues correctly.
+    void this.actor.send({ type: 'nudgeRecovery' })
+  }
+
+  _doNudgeRecovery(): void {
     if (!this._recovering || this._disabled) return
     if (this._recoveryTimer) clearTimeout(this._recoveryTimer)
     this._scheduleRecoveryAttempt(0)
@@ -344,7 +353,11 @@ export class UnifiedTradingAccount {
 
   // ==================== Stage operations ====================
 
-  stagePlaceOrder(params: StagePlaceOrderParams): AddResult {
+  async stagePlaceOrder(params: StagePlaceOrderParams): Promise<AddResult> {
+    return this.actor.send<AddResult>({ type: 'stagePlaceOrder', params })
+  }
+
+  _doStagePlaceOrder(params: StagePlaceOrderParams): AddResult {
     // Resolve aliceId → full contract via broker (fills secType, exchange, currency, conId, etc.)
     const parsed = UnifiedTradingAccount.parseAliceId(params.aliceId)
     if (!parsed) {
@@ -378,7 +391,11 @@ export class UnifiedTradingAccount {
     return this.git.add({ action: 'placeOrder', contract, order, tpsl })
   }
 
-  stageModifyOrder(params: StageModifyOrderParams): AddResult {
+  async stageModifyOrder(params: StageModifyOrderParams): Promise<AddResult> {
+    return this.actor.send<AddResult>({ type: 'stageModifyOrder', params })
+  }
+
+  _doStageModifyOrder(params: StageModifyOrderParams): AddResult {
     const changes: Partial<Order> = {}
     if (params.totalQuantity != null) changes.totalQuantity = new Decimal(String(params.totalQuantity))
     if (params.lmtPrice != null) changes.lmtPrice = new Decimal(String(params.lmtPrice))
@@ -392,7 +409,11 @@ export class UnifiedTradingAccount {
     return this.git.add({ action: 'modifyOrder', orderId: params.orderId, changes })
   }
 
-  stageClosePosition(params: StageClosePositionParams): AddResult {
+  async stageClosePosition(params: StageClosePositionParams): Promise<AddResult> {
+    return this.actor.send<AddResult>({ type: 'stageClosePosition', params })
+  }
+
+  _doStageClosePosition(params: StageClosePositionParams): AddResult {
     const parsed = UnifiedTradingAccount.parseAliceId(params.aliceId)
     if (!parsed) {
       throw new Error(`Invalid aliceId "${params.aliceId}". Use searchContracts to get a valid contract identifier (expected format: "accountId|nativeKey").`)
@@ -408,17 +429,29 @@ export class UnifiedTradingAccount {
     })
   }
 
-  stageCancelOrder(params: { orderId: string }): AddResult {
+  async stageCancelOrder(params: { orderId: string }): Promise<AddResult> {
+    return this.actor.send<AddResult>({ type: 'stageCancelOrder', params })
+  }
+
+  _doStageCancelOrder(params: { orderId: string }): AddResult {
     return this.git.add({ action: 'cancelOrder', orderId: params.orderId })
   }
 
   // ==================== Git flow ====================
 
-  commit(message: string): CommitPrepareResult {
+  async commit(message: string): Promise<CommitPrepareResult> {
+    return this.actor.send<CommitPrepareResult>({ type: 'commit', message })
+  }
+
+  _doCommit(message: string): CommitPrepareResult {
     return this.git.commit(message)
   }
 
   async push(): Promise<PushResult> {
+    return this.actor.send<PushResult>({ type: 'push' })
+  }
+
+  async _doPush(): Promise<PushResult> {
     if (this._disabled) {
       throw new BrokerError('CONFIG', `Account "${this.label}" is disabled due to configuration error.`)
     }
@@ -431,6 +464,10 @@ export class UnifiedTradingAccount {
   }
 
   async reject(reason?: string): Promise<RejectResult> {
+    return this.actor.send<RejectResult>({ type: 'reject', reason })
+  }
+
+  async _doReject(reason?: string): Promise<RejectResult> {
     const result = await this.git.reject(reason)
     Promise.resolve(this._onPostReject?.(this.id)).catch(() => {})
     return result
@@ -451,6 +488,10 @@ export class UnifiedTradingAccount {
   }
 
   async sync(opts?: { delayMs?: number }): Promise<SyncResult> {
+    return this.actor.send<SyncResult>({ type: 'sync', opts })
+  }
+
+  async _doSync(opts?: { delayMs?: number }): Promise<SyncResult> {
     const pendingOrders = this.git.getPendingOrderIds()
     if (pendingOrders.length === 0) {
       return { hash: '', updatedCount: 0, updates: [] }
@@ -503,7 +544,11 @@ export class UnifiedTradingAccount {
     return this.git.simulatePriceChange(priceChanges)
   }
 
-  setCurrentRound(round: number): void {
+  async setCurrentRound(round: number): Promise<void> {
+    return this.actor.send<void>({ type: 'setCurrentRound', round })
+  }
+
+  _doSetCurrentRound(round: number): void {
     this.git.setCurrentRound(round)
   }
 
@@ -576,6 +621,10 @@ export class UnifiedTradingAccount {
   // ==================== Lifecycle ====================
 
   async close(): Promise<void> {
+    return this.actor.send<void>({ type: 'close' })
+  }
+
+  async _doClose(): Promise<void> {
     if (this._recoveryTimer) {
       clearTimeout(this._recoveryTimer)
       this._recoveryTimer = undefined

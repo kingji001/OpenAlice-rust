@@ -64,21 +64,21 @@ const cancelOrderSchema = z.object({
  * which step failed (stage → guards bounced; commit → invalid state;
  * push → broker exception before any per-op result).
  */
-async function executeOneShot<T>(
+async function executeOneShot(
   c: Context,
   uta: UnifiedTradingAccount,
   message: string,
-  stage: () => T,
+  stage: () => unknown,
 ): Promise<Response> {
   // Stage
   try {
-    stage()
+    await stage()
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err), phase: 'stage' }, 400)
   }
   // Commit
   try {
-    uta.commit(message)
+    await uta.commit(message)
   } catch (err) {
     // Roll back the staging area so the next attempt starts clean.
     try { await uta.reject('auto-rollback after commit error') } catch { /* best effort */ }
@@ -319,9 +319,9 @@ export function createTradingRoutes(ctx: EngineContext) {
     } catch (err) {
       return c.json({ error: err instanceof z.ZodError ? err.message : String(err), phase: 'validate' }, 400)
     }
-    return executeOneShot(c, uta, body.message, () => {
+    return executeOneShot(c, uta, body.message, async () => {
       const { message: _msg, ...stageParams } = body
-      uta.stagePlaceOrder(stageParams)
+      await uta.stagePlaceOrder(stageParams)
     })
   })
 
@@ -334,10 +334,10 @@ export function createTradingRoutes(ctx: EngineContext) {
     } catch (err) {
       return c.json({ error: err instanceof z.ZodError ? err.message : String(err), phase: 'validate' }, 400)
     }
-    return executeOneShot(c, uta, body.message, () => {
+    return executeOneShot(c, uta, body.message, async () => {
       const { message: _msg, ...stageParams } = body
       // qty stays a string all the way to Decimal — no float roundtrip.
-      uta.stageClosePosition(stageParams)
+      await uta.stageClosePosition(stageParams)
     })
   })
 
@@ -350,8 +350,8 @@ export function createTradingRoutes(ctx: EngineContext) {
     } catch (err) {
       return c.json({ error: err instanceof z.ZodError ? err.message : String(err), phase: 'validate' }, 400)
     }
-    return executeOneShot(c, uta, body.message, () => {
-      uta.stageCancelOrder({ orderId: body.orderId })
+    return executeOneShot(c, uta, body.message, async () => {
+      await uta.stageCancelOrder({ orderId: body.orderId })
     })
   })
 

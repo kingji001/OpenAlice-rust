@@ -123,8 +123,8 @@ describe('createTradingTools — getOrders summarization', () => {
     const mgr = makeManager(broker)
     const uta = mgr.resolve('mock-paper')[0]
 
-    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
-    uta.commit('buy')
+    await uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
+    await uta.commit('buy')
     await uta.push()
 
     const tools = createTradingTools(mgr)

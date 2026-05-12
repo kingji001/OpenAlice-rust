@@ -40,7 +40,7 @@ describe('UTA — Alpaca order lifecycle', () => {
     const aliceId = `${uta!.id}|${nativeKey}`
 
     // Stage a limit buy at $1 (won't fill)
-    const addResult = uta!.stagePlaceOrder({
+    const addResult = await uta!.stagePlaceOrder({
       aliceId,
       symbol: 'AAPL',
       action: 'BUY',
@@ -51,7 +51,7 @@ describe('UTA — Alpaca order lifecycle', () => {
     })
     expect(addResult.staged).toBe(true)
 
-    const commitResult = uta!.commit('e2e: limit buy 1 AAPL @ $1')
+    const commitResult = await uta!.commit('e2e: limit buy 1 AAPL @ $1')
     expect(commitResult.prepared).toBe(true)
     console.log(`  committed: hash=${commitResult.hash}`)
 
@@ -64,8 +64,8 @@ describe('UTA — Alpaca order lifecycle', () => {
     const orderId = pushResult.submitted[0].orderId!
 
     // Cancel the order
-    uta!.stageCancelOrder({ orderId })
-    uta!.commit('e2e: cancel limit order')
+    await uta!.stageCancelOrder({ orderId })
+    await uta!.commit('e2e: cancel limit order')
     const cancelPush = await uta!.push()
     console.log(`  cancel pushed: submitted=${cancelPush.submitted.length}, status=${cancelPush.submitted[0]?.status}`)
     expect(cancelPush.submitted).toHaveLength(1)
@@ -87,12 +87,12 @@ describe('UTA — Alpaca TPSL bracket', () => {
     const nativeKey = broker!.getNativeKey({ symbol: 'AAPL' } as any)
     const aliceId = `${uta!.id}|${nativeKey}`
 
-    uta!.stagePlaceOrder({
+    await uta!.stagePlaceOrder({
       aliceId, symbol: 'AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '1',
       takeProfit: { price: '999' },
       stopLoss: { price: '1' },
     })
-    uta!.commit('e2e: buy AAPL with TPSL')
+    await uta!.commit('e2e: buy AAPL with TPSL')
     const pushResult = await uta!.push()
     expect(pushResult.submitted).toHaveLength(1)
     const orderId = pushResult.submitted[0].orderId!
@@ -112,8 +112,8 @@ describe('UTA — Alpaca TPSL bracket', () => {
     }
 
     // Clean up — cancel the bracket legs then close position
-    uta!.stageClosePosition({ aliceId, qty: '1' })
-    uta!.commit('e2e: close TPSL AAPL')
+    await uta!.stageClosePosition({ aliceId, qty: '1' })
+    await uta!.commit('e2e: close TPSL AAPL')
     await uta!.push()
   }, 30_000)
 })
@@ -136,7 +136,7 @@ describe('UTA — Alpaca fill flow (AAPL)', () => {
     console.log(`  initial AAPL qty=${initialAaplQty}`)
 
     // === Stage + Commit + Push: buy 1 AAPL ===
-    const addResult = uta!.stagePlaceOrder({
+    const addResult = await uta!.stagePlaceOrder({
       aliceId,
       symbol: 'AAPL',
       action: 'BUY',
@@ -145,7 +145,7 @@ describe('UTA — Alpaca fill flow (AAPL)', () => {
     })
     expect(addResult.staged).toBe(true)
 
-    const commitResult = uta!.commit('e2e: buy 1 AAPL')
+    const commitResult = await uta!.commit('e2e: buy 1 AAPL')
     expect(commitResult.prepared).toBe(true)
     console.log(`  committed: hash=${commitResult.hash}`)
 
@@ -172,8 +172,8 @@ describe('UTA — Alpaca fill flow (AAPL)', () => {
     expect(aaplPos!.quantity.toNumber()).toBe(initialAaplQty + 1)
 
     // === Close 1 AAPL ===
-    uta!.stageClosePosition({ aliceId, qty: '1' })
-    uta!.commit('e2e: close 1 AAPL')
+    await uta!.stageClosePosition({ aliceId, qty: '1' })
+    await uta!.commit('e2e: close 1 AAPL')
     const closePush = await uta!.push()
     console.log(`  close pushed: status=${closePush.submitted[0]?.status}`)
     expect(closePush.submitted).toHaveLength(1)

@@ -50,7 +50,7 @@ describe('UTA — Bybit lifecycle (ETH perp)', () => {
     console.log(`  initial ETH qty=${initialEthQty}`)
 
     // === Stage + Commit + Push: buy 0.01 ETH ===
-    const addResult = uta!.stagePlaceOrder({
+    const addResult = await uta!.stagePlaceOrder({
       aliceId: ethAliceId,
       action: 'BUY',
       orderType: 'MKT',
@@ -59,7 +59,7 @@ describe('UTA — Bybit lifecycle (ETH perp)', () => {
     expect(addResult.staged).toBe(true)
     console.log(`  staged: ok`)
 
-    const commitResult = uta!.commit('e2e: buy 0.01 ETH')
+    const commitResult = await uta!.commit('e2e: buy 0.01 ETH')
     expect(commitResult.prepared).toBe(true)
     console.log(`  committed: hash=${commitResult.hash}`)
 
@@ -90,8 +90,8 @@ describe('UTA — Bybit lifecycle (ETH perp)', () => {
     expect(state1.pendingOrders).toHaveLength(0)
 
     // === Stage + Commit + Push: close 0.01 ETH ===
-    uta!.stageClosePosition({ aliceId: ethAliceId, qty: '0.01' })
-    uta!.commit('e2e: close 0.01 ETH')
+    await uta!.stageClosePosition({ aliceId: ethAliceId, qty: '0.01' })
+    await uta!.commit('e2e: close 0.01 ETH')
     const closePush = await uta!.push()
     console.log(`  close pushed: submitted=${closePush.submitted.length}, status=${closePush.submitted[0]?.status}`)
     expect(closePush.submitted).toHaveLength(1)
@@ -123,12 +123,12 @@ describe('UTA — Bybit lifecycle (ETH perp)', () => {
     const tpPrice = Math.round(Number(quote.last) * 1.5)
     const slPrice = Math.round(Number(quote.last) * 0.5)
 
-    uta!.stagePlaceOrder({
+    await uta!.stagePlaceOrder({
       aliceId: ethAliceId, action: 'BUY', orderType: 'MKT', totalQuantity: '0.01',
       takeProfit: { price: String(tpPrice) },
       stopLoss: { price: String(slPrice) },
     })
-    uta!.commit('e2e: buy ETH with TPSL')
+    await uta!.commit('e2e: buy ETH with TPSL')
     const pushResult = await uta!.push()
     expect(pushResult.submitted).toHaveLength(1)
     const orderId = pushResult.submitted[0].orderId!
@@ -148,8 +148,8 @@ describe('UTA — Bybit lifecycle (ETH perp)', () => {
     }
 
     // Clean up
-    uta!.stageClosePosition({ aliceId: ethAliceId, qty: '0.01' })
-    uta!.commit('e2e: close TPSL')
+    await uta!.stageClosePosition({ aliceId: ethAliceId, qty: '0.01' })
+    await uta!.commit('e2e: close TPSL')
     await uta!.push()
   }, 60_000)
 })

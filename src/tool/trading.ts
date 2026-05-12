@@ -453,12 +453,12 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
         source: z.string().optional().describe(sourceDesc(false, 'If omitted, commits all accounts with staged operations.')),
         message: z.string().describe('Commit message explaining your trading decision'),
       }),
-      execute: ({ source, message }) => {
+      execute: async ({ source, message }) => {
         const targets = manager.resolve(source)
         const results: Array<Record<string, unknown>> = []
         for (const uta of targets) {
           if (uta.status().staged.length === 0) continue
-          results.push({ source: uta.id, ...uta.commit(message) })
+          results.push({ source: uta.id, ...await uta.commit(message) })
         }
         if (results.length === 0) return { message: 'No staged operations to commit.' }
         return results.length === 1 ? results[0] : results
