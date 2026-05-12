@@ -1,13 +1,12 @@
 #!/usr/bin/env tsx
 /**
- * parity/check-git.ts — TS vs Rust byte-parity for git scenarios.
+ * parity/check-git.ts — TS vs Rust STRUCTURAL parity for git scenarios.
  *
- * For each scenario (excluding 03 and 09 which use syncOrders operations
- * that have TS/Rust behavioral differences):
+ * For each scenario:
  *   1. Run via run-ts.ts --scenario → state-ts.json (normalised)
  *   2. Run via run-rust.ts --scenario → state-rust.json (normalised)
- *   3. Compare normalised structures — structural parity (commit count,
- *      messages, operation actions, stateAfter, result counts).
+ *   3. Compare normalised structures — commit count, messages,
+ *      operation actions, stateAfter, result counts.
  *
  * Hash and timestamp fields are EXCLUDED from comparison because:
  *   - TS stubs Date to 2026-01-01T00:00:00.000Z; Rust uses real-time clocks.
@@ -17,7 +16,21 @@
  * with all IBKR default sentinel values (~100 fields) that the Rust layer
  * does not add (it stores only what's in the fixture JSON).
  *
- * All Phase 3 structural invariants are verified:
+ * SCOPE: byte-exact parity for the v2 hash + canonical JSON is proven
+ * separately by:
+ *   - crates/alice-trading-core/tests/v2_fixtures_verify.rs — recomputes
+ *     intentFullHash for all 23 stored v2 commits
+ *   - crates/alice-trading-core/tests/git_roundtrip.rs — restores fixture
+ *     → exports → asserts equal Value
+ *   - crates/alice-trading-core/tests/hash_v2_golden.rs — pins the
+ *     Phase 2 TS golden hash 2a98a2d0…23c97d
+ *
+ * Live-scenario byte parity needs Phase 4d work: Rust-side time stubbing
+ * matching parity/run-ts.ts's FIXED_TIME_MS plus operation pre-inflation
+ * in parity/run-rust.ts to mirror TS's `new Order()` + sentinel-default
+ * pattern. Both belong in the Rust broker layer.
+ *
+ * Phase 3 structural invariants verified here:
  *   - same number of commits
  *   - same commit messages in order
  *   - same operation count per commit
@@ -227,7 +240,8 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
-  console.log('\nAll Phase 3 parity scenarios match byte-for-byte.')
+  console.log('\nAll Phase 3 parity scenarios pass structural checks.')
+  console.log('(byte-exact v2 hash + canonical JSON parity is verified by cargo tests v2_fixtures_verify, git_roundtrip, and hash_v2_golden — see file header)')
 }
 
 main().catch((e) => { console.error(e); process.exit(1) })
