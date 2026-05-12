@@ -23,22 +23,28 @@ pnpm test           # Unit tests
 
 `pnpm build` uses tsup which is lenient — `tsc --noEmit` catches strict type errors that tsup ignores.
 
-## Binance Cross Margin Focus
+## Binance Cross Margin + Futures Focus
 
-As of 2026-05-13, OpenAlice pivots to **Binance Cross Margin Classic** as the
-sole real broker. See `docs/binance-pivot-plan.md` for the full rationale and
-task breakdown.
+As of 2026-05-13, OpenAlice trades exclusively against Binance:
+- **Cross Margin Spot** (`cross-margin`) — see pivot plan at `docs/binance-pivot-plan.md`
+- **USDⓈ-M Futures** (`usdm-futures`, fapi.binance.com)
+- **COIN-M Futures** (`coinm-futures`, dapi.binance.com)
 
-**Broker landscape (post-pivot):**
-- `brokers/ccxt/` — CcxtBroker configured for Binance (`exchange: 'binance'`, `marginType: 'cross'`)
+See `docs/binance-futures-expansion.md` for the futures expansion rationale.
+
+**Broker landscape (post-pivot + expansion):**
+- `brokers/ccxt/` — CcxtBroker, single class wired for all 4 Binance modes (`tradingMode: 'spot' | 'cross-margin' | 'usdm-futures' | 'coinm-futures'`)
 - `brokers/mock/` — In-memory test broker (retained for test infrastructure)
-- All other broker directories (alpaca, ibkr, longbridge, others) were deleted in the pivot.
 
-The Rust core (`crates/alice-trading-core/`) is broker-agnostic and fully
-retained — TradingGit, guards, journal (now with Borrow/Repay/TransferFunding
-variants), UtaActor, and the napi proxy all continue unchanged.
+**Presets:**
+- `binance-cross-margin`
+- `binance-usdm-futures`
+- `binance-coinm-futures`
+- `mock-paper`
 
-The only non-mock preset is `binance-cross-margin` in `src/domain/trading/brokers/preset-catalog.ts`.
+The Rust core (`crates/alice-trading-core/`) is broker-agnostic and fully retained — TradingGit, guards, journal (with Borrow/Repay/TransferFunding margin variants), UtaActor, and the napi proxy all continue unchanged.
+
+Portfolio Margin (`papi.binance.com`) and Options remain out of scope.
 
 ## Subsystem guides
 
