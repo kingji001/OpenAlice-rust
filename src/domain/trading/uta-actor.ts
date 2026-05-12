@@ -142,6 +142,11 @@ export class TsUtaActor {
       try {
         work = Promise.resolve(this.dispatch(queued.cmd))
       } catch (e) {
+        // Only fires for synchronous _doFoo methods that throw synchronously
+        // from within dispatch() (e.g., a sync reader like _doStatus throwing).
+        // Async _doFoo handlers that throw — including the reentrant-send case
+        // when an `async _doFoo` calls actor.send() in its sync prologue —
+        // surface via the rejected `work` promise below, not via this catch.
         this.reentrancyDepth--
         queued.reject(e)
         continue
