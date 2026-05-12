@@ -1,17 +1,20 @@
-//! UtaActor — single-task per-UTA event loop. Phase 4d Task A scaffold:
-//! only Add/Commit/ExportState/Shutdown variants implemented; Push/Reject/
-//! Sync/Health/NudgeRecovery wired in later tasks.
+//! UtaActor — single-task per-UTA event loop. Phase 4d Task B:
+//! tokio::select! over cmd_rx + signal_rx. GetHealth and NudgeRecovery
+//! wired. Push/Reject/Sync scaffolded for Task D.
 
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 
 use crate::brokers::error::{BrokerError, BrokerErrorCode};
+use crate::brokers::types::BrokerHealthInfo;
 use crate::types::{AddResult, CommitPrepareResult, GitExportState, Operation};
-use crate::uta::command::UtaCommand;
+use crate::uta::command::{RecoverySignal, UtaCommand};
 use crate::uta::state::UtaState;
 
 pub struct UtaActor {
     cmd_rx: mpsc::Receiver<UtaCommand>,
+    signal_rx: mpsc::Receiver<RecoverySignal>,
+    signal_tx: mpsc::Sender<RecoverySignal>,
     state: UtaState,
 }
 
@@ -33,8 +36,14 @@ impl UtaActor {
     /// Build and spawn the actor on a tokio task.
     pub fn spawn(state: UtaState, buffer: usize) -> (UtaHandle, JoinHandle<()>) {
         let (tx, rx) = mpsc::channel(buffer);
+        let (sig_tx, sig_rx) = mpsc::channel(8);
         let account_id = state.account_id.clone();
-        let actor = UtaActor { cmd_rx: rx, state };
+        let actor = UtaActor {
+            cmd_rx: rx,
+            signal_rx: sig_rx,
+            signal_tx: sig_tx,
+            state,
+        };
         let join = tokio::spawn(actor.run());
         (
             UtaHandle {
@@ -46,48 +55,91 @@ impl UtaActor {
     }
 
     pub async fn run(mut self) {
-        while let Some(cmd) = self.cmd_rx.recv().await {
-            match cmd {
-                UtaCommand::Add { op, reply } => {
-                    let result = self.handle_add(op);
-                    let _ = reply.send(result);
+        loop {
+            tokio::select! {
+                Some(cmd) = self.cmd_rx.recv() => {
+                    let should_exit = self.dispatch_cmd(cmd).await;
+                    if should_exit { return; }
                 }
-                UtaCommand::Commit { message, reply } => {
-                    let result = self.handle_commit(message);
-                    let _ = reply.send(result);
+                Some(sig) = self.signal_rx.recv() => {
+                    self.dispatch_signal(sig);
                 }
-                UtaCommand::ExportState { reply } => {
-                    let _ = reply.send(self.state.git.export_state());
-                }
-                UtaCommand::Shutdown { reply } => {
-                    let _ = reply.send(());
-                    return;
-                }
-                // Phase 4d Task B/C/D add the remaining variants below.
-                UtaCommand::Push { reply } => {
-                    let _ = reply.send(Err(BrokerError::new(
-                        BrokerErrorCode::Unknown,
-                        "Task A scaffold: Push not yet implemented".to_string(),
-                    )));
-                }
-                UtaCommand::Reject { reply, .. } => {
-                    let _ = reply.send(Err(BrokerError::new(
-                        BrokerErrorCode::Unknown,
-                        "Task A scaffold: Reject not yet implemented".to_string(),
-                    )));
-                }
-                UtaCommand::Sync { reply, .. } => {
-                    let _ = reply.send(Err(BrokerError::new(
-                        BrokerErrorCode::Unknown,
-                        "Task A scaffold: Sync not yet implemented".to_string(),
-                    )));
-                }
-                UtaCommand::GetHealth { reply: _ } => {
-                    // Task B replaces this with self.state.health.info()
-                }
-                UtaCommand::NudgeRecovery => {
-                    // Task B wires nudge_recovery
-                }
+                else => return,
+            }
+        }
+    }
+
+    async fn dispatch_cmd(&mut self, cmd: UtaCommand) -> bool {
+        match cmd {
+            UtaCommand::Add { op, reply } => {
+                let _ = reply.send(self.handle_add(op));
+                false
+            }
+            UtaCommand::Commit { message, reply } => {
+                let _ = reply.send(self.handle_commit(message));
+                false
+            }
+            UtaCommand::ExportState { reply } => {
+                let _ = reply.send(self.state.git.export_state());
+                false
+            }
+            UtaCommand::GetHealth { reply } => {
+                let _ = reply.send(self.state.health.info());
+                false
+            }
+            UtaCommand::NudgeRecovery => {
+                let broker = self.state.broker.clone();
+                let sig_tx = self.signal_tx.clone();
+                self.state.health.nudge_recovery(broker, sig_tx);
+                false
+            }
+            UtaCommand::Shutdown { reply } => {
+                let _ = reply.send(());
+                true
+            }
+            // Task D fills in Push/Reject/Sync.
+            UtaCommand::Push { reply } => {
+                let _ = reply.send(Err(BrokerError::new(
+                    BrokerErrorCode::Unknown,
+                    "Task D scaffold: Push not yet implemented".to_string(),
+                )));
+                false
+            }
+            UtaCommand::Reject { reply, .. } => {
+                let _ = reply.send(Err(BrokerError::new(
+                    BrokerErrorCode::Unknown,
+                    "Task D scaffold: Reject not yet implemented".to_string(),
+                )));
+                false
+            }
+            UtaCommand::Sync { reply, .. } => {
+                let _ = reply.send(Err(BrokerError::new(
+                    BrokerErrorCode::Unknown,
+                    "Task D scaffold: Sync not yet implemented".to_string(),
+                )));
+                false
+            }
+        }
+    }
+
+    fn dispatch_signal(&mut self, sig: RecoverySignal) {
+        match sig {
+            RecoverySignal::Recovered => {
+                self.state.health.on_success();
+                tracing::info!(
+                    target: "uta",
+                    account = %self.state.account_id,
+                    "recovery succeeded"
+                );
+            }
+            RecoverySignal::Attempt { attempt, error } => {
+                tracing::warn!(
+                    target: "uta",
+                    account = %self.state.account_id,
+                    attempt,
+                    error = %error,
+                    "recovery attempt failed"
+                );
             }
         }
     }
@@ -129,6 +181,23 @@ impl UtaHandle {
         rx.await.map_err(|_| "actor reply dropped".to_string())
     }
 
+    pub async fn get_health(&self) -> Result<BrokerHealthInfo, String> {
+        let (tx, rx) = oneshot::channel();
+        self.cmd_tx
+            .send(UtaCommand::GetHealth { reply: tx })
+            .await
+            .map_err(|_| "actor stopped".to_string())?;
+        rx.await.map_err(|_| "actor reply dropped".to_string())
+    }
+
+    /// Fire-and-forget nudge to restart recovery at attempt=0.
+    pub async fn nudge_recovery(&self) -> Result<(), String> {
+        self.cmd_tx
+            .send(UtaCommand::NudgeRecovery)
+            .await
+            .map_err(|_| "actor stopped".to_string())
+    }
+
     pub async fn shutdown(self) -> Result<(), String> {
         let (tx, rx) = oneshot::channel();
         self.cmd_tx
@@ -137,6 +206,4 @@ impl UtaHandle {
             .map_err(|_| "actor already stopped".to_string())?;
         rx.await.map_err(|_| "actor reply dropped".to_string())
     }
-
-    // Task B/C/D add: push, reject, sync, get_health, nudge_recovery, etc.
 }

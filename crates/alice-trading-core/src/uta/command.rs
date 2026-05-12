@@ -54,3 +54,9 @@ pub enum UtaEvent {
         info: BrokerHealthInfo,
     },
 }
+
+/// Internal signal from the recovery task back to the actor.
+pub enum RecoverySignal {
+    Recovered,
+    Attempt { attempt: u32, error: String },
+}

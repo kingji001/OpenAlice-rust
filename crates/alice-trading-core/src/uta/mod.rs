@@ -8,5 +8,5 @@ pub mod health;
 pub mod state;
 
 pub use actor::{UtaActor, UtaHandle};
-pub use command::{UtaCommand, UtaEvent};
+pub use command::{RecoverySignal, UtaCommand, UtaEvent};
 pub use state::UtaState;

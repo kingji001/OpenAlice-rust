@@ -36,7 +36,7 @@ impl UtaState {
             git: TradingGit::new(git_config),
             broker,
             guards,
-            health: HealthState,
+            health: HealthState::default(),
             commit_path,
             event_tx: None,
             data_root,
