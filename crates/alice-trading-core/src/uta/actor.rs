@@ -64,32 +64,38 @@ impl UtaActor {
     }
 
     async fn run_with_reconciliation(mut self) {
-        // Reconcile any pending journal entries from a previous run
-        match crate::journal::reconcile::reconcile_journal(
+        use std::time::Duration;
+        // Reconcile any pending journal entries from a previous run.
+        // Guarded by a 30-second timeout so a slow/unreachable broker cannot
+        // block the actor from entering its command loop (including Shutdown).
+        let reconcile_fut = crate::journal::reconcile::reconcile_journal(
             &self.state.journal,
             &self.state.broker,
             &mut self.state.git,
             &self.state.account_id,
             &self.state.data_root,
-        )
-        .await
-        {
-            Ok(outcomes) => {
+        );
+        match tokio::time::timeout(Duration::from_secs(30), reconcile_fut).await {
+            Ok(Ok(outcomes)) => {
                 if !outcomes.is_empty() {
                     tracing::info!(
-                        target: "uta",
-                        account = %self.state.account_id,
+                        target: "uta", account = %self.state.account_id,
                         outcome_count = outcomes.len(),
                         "reconciled pending journal entries"
                     );
                 }
             }
-            Err(e) => {
+            Ok(Err(e)) => {
                 tracing::error!(
-                    target: "uta",
-                    account = %self.state.account_id,
+                    target: "uta", account = %self.state.account_id,
                     error = %e,
                     "reconciliation failed at startup; continuing"
+                );
+            }
+            Err(_elapsed) => {
+                tracing::warn!(
+                    target: "uta", account = %self.state.account_id,
+                    "reconciliation timed out after 30s; deferring to next startup"
                 );
             }
         }

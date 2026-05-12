@@ -93,9 +93,21 @@ pub async fn reconcile_journal(
             commit_hash: commit_hash.clone(),
             action,
         });
-        // Close the entry idempotently
-        let handle = JournalHandle { commit_hash };
-        let _ = journal.close(handle).await; // Best-effort — already-moved entries return Err
+        // Close the entry idempotently. Log a warning on failure so that a
+        // stranded entry (e.g. disk-full, permission error, EXDEV rename) is
+        // surfaced rather than silently accumulating broker queries on every
+        // subsequent startup.
+        let handle = JournalHandle {
+            commit_hash: commit_hash.clone(),
+        };
+        if let Err(e) = journal.close(handle).await {
+            tracing::warn!(
+                target: "reconciler", account = %account_id,
+                commit_hash = %commit_hash,
+                error = %e,
+                "journal close failed during reconciliation; entry stranded in executing/ (will retry next startup)"
+            );
+        }
     }
 
     Ok(outcomes)
