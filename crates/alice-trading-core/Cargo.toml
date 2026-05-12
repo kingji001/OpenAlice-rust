@@ -29,5 +29,8 @@ tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 chrono = { version = "0.4", features = ["clock"] }
 
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
 [build-dependencies]
 napi-build = "2"
