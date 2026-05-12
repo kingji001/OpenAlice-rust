@@ -49,7 +49,7 @@ Use searchContracts first to get the aliceId.`,
         const { broker, id } = resolved
         const contract = new Contract()
         contract.aliceId = aliceId
-        const result = await broker.getFundingRate(contract)
+        const result = await broker.fetchFundingRateByContract(contract)
         return { source: id, ...result }
       },
     }),

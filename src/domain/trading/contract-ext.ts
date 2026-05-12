@@ -34,5 +34,16 @@ declare module '@traderalice/ibkr-types' {
       isIsolated?: boolean
       autoRepayAtCancel?: boolean
     }
+    /**
+     * Futures-trading parameters. When present, the order routes through
+     * the futures endpoint with Binance-specific behavior (positionSide,
+     * reduceOnly, etc.). When absent, falls back to spot/margin behavior.
+     */
+    futuresParams?: {
+      positionSide?: 'BOTH' | 'LONG' | 'SHORT'
+      reduceOnly?: boolean
+      closePosition?: boolean
+      timeInForce?: 'GTC' | 'IOC' | 'FOK' | 'GTX'
+    }
   }
 }

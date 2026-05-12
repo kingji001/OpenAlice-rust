@@ -59,6 +59,70 @@ export class BrokerError extends Error {
   }
 }
 
+// ==================== Futures types ====================
+
+/**
+ * Futures-specific order parameters. When set on Order.futuresParams,
+ * the order routes through the futures endpoint with Binance-specific behavior.
+ */
+export interface FuturesOrderParams {
+  /**
+   * - 'BOTH' (default, one-way mode): single position per symbol
+   * - 'LONG' / 'SHORT' (hedge mode): independent long and short positions
+   */
+  positionSide?: 'BOTH' | 'LONG' | 'SHORT'
+  /** If true, order can only reduce position (never flip side). */
+  reduceOnly?: boolean
+  /** If true, close entire position at market on fill. */
+  closePosition?: boolean
+  /** Time-in-force. Default GTC. */
+  timeInForce?: 'GTC' | 'IOC' | 'FOK' | 'GTX'
+}
+
+/**
+ * Funding rate snapshot for a USDM/COINM perpetual contract.
+ */
+export interface FundingRate {
+  symbol: string
+  /** Funding rate (decimal, e.g. "0.0001" = 0.01%) */
+  rate: string
+  /** Annualized rate estimate, if computable */
+  annualizedRate?: string
+  /** Next funding time (ISO 8601) */
+  nextFundingTime: string
+  /** Mark price at snapshot */
+  markPrice: string
+  /** Index price at snapshot */
+  indexPrice?: string
+}
+
+/**
+ * Per-symbol leverage setting.
+ */
+export interface LeverageSetting {
+  symbol: string
+  /** Effective leverage (1–125 typically, symbol-dependent) */
+  leverage: number
+  /** Max notional value at this leverage (USD or quote currency) */
+  maxNotionalValue?: string
+}
+
+/**
+ * Mark price snapshot — used by futures for liquidation/margin/funding calculations.
+ * Distinct from last-trade price.
+ */
+export interface MarkPriceSnapshot {
+  symbol: string
+  markPrice: string
+  /** Index price (basket of spot exchanges, where applicable) */
+  indexPrice?: string
+  /** Estimated annualized funding rate, if available */
+  estimatedFundingRate?: string
+}
+
+export type PositionMode = 'ONE_WAY' | 'HEDGE'
+export type MarginMode = 'CROSS' | 'ISOLATED'
+
 // ==================== Cross Margin types ====================
 
 /**
@@ -175,6 +239,26 @@ export interface Position {
     interest: string
     /** Snapshot of the account's margin level at position read time */
     marginLevel: string
+  }
+  /**
+   * Futures-specific metadata. Undefined for spot and Cross Margin positions;
+   * populated for positions held on USDM/COINM Futures.
+   */
+  futuresMetadata?: {
+    /** Mark price at read time (different from market trade price) */
+    markPrice: string
+    /** Liquidation price (broker-calculated). Undefined for positions with no liquidation risk. */
+    liquidationPrice?: string
+    /** Effective leverage on this position (1-125 typically) */
+    leverage: number
+    /** Margin mode at the position level */
+    marginMode: MarginMode
+    /** Position side (relevant in hedge mode). 'BOTH' in one-way mode. */
+    positionSide: 'BOTH' | 'LONG' | 'SHORT'
+    /** Initial margin used (Decimal string) */
+    initialMargin?: string
+    /** Maintenance margin required (Decimal string) */
+    maintMargin?: string
   }
 }
 
@@ -384,4 +468,39 @@ export interface IBroker<TMeta = unknown> {
    * Transfer funds between Spot Wallet and Cross Margin Wallet.
    */
   transferFunding?(op: FundingTransfer): Promise<MarginOperationResult>
+
+  // ---- Futures trading (optional — only implemented by futures-capable brokers) ----
+
+  /**
+   * Set per-symbol leverage. Idempotent — calling with the same value is a no-op.
+   * Required before placing leveraged orders on most futures symbols.
+   */
+  setLeverage?(symbol: string, leverage: number): Promise<LeverageSetting>
+
+  /** Read the current leverage setting for a symbol. */
+  getLeverage?(symbol: string): Promise<LeverageSetting>
+
+  /**
+   * Set account-wide position mode (one-way vs hedge).
+   * Note: cannot be changed while open positions exist.
+   */
+  setPositionMode?(mode: PositionMode): Promise<void>
+
+  /** Read current account-wide position mode. */
+  getPositionMode?(): Promise<PositionMode>
+
+  /**
+   * Set per-symbol margin mode (CROSS or ISOLATED).
+   * Cannot be changed while there are open positions on the symbol.
+   */
+  setMarginMode?(symbol: string, mode: MarginMode): Promise<void>
+
+  /** Read the current funding rate for a perpetual symbol. */
+  getFundingRate?(symbol: string): Promise<FundingRate>
+
+  /**
+   * Read mark price for a symbol (futures-specific). Different from
+   * last-trade price — used internally for liquidation calculations.
+   */
+  getMarkPrice?(symbol: string): Promise<MarkPriceSnapshot>
 }

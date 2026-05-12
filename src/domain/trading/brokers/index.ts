@@ -16,6 +16,13 @@ export type {
   MarginOrderParams,
   FundingTransfer,
   MarginOperationResult,
+  // Futures trading types (USDM/COINM Futures expansion)
+  FuturesOrderParams,
+  FundingRate,
+  LeverageSetting,
+  MarkPriceSnapshot,
+  PositionMode,
+  MarginMode,
 } from './types.js'
 
 // Factory

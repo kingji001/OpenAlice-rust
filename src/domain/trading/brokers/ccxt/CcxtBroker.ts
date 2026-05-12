@@ -899,7 +899,7 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
 
   // ---- Provider-specific methods ----
 
-  async getFundingRate(contract: Contract): Promise<FundingRate> {
+  async fetchFundingRateByContract(contract: Contract): Promise<FundingRate> {
     this.ensureInit()
 
     const ccxtSymbol = contractToCcxt(contract, this.markets, this.exchangeName)
