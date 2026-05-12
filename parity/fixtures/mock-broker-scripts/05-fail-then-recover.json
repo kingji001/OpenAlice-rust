@@ -1,0 +1,9 @@
+{
+  "description": "set_fail_mode(2), 3 getAccount calls — first 2 fail, 3rd succeeds",
+  "steps": [
+    { "type": "setFailMode", "count": 2 },
+    { "type": "getAccount", "expectError": true },
+    { "type": "getAccount", "expectError": true },
+    { "type": "getAccount", "expectError": false }
+  ]
+}

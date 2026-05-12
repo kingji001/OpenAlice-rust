@@ -1,0 +1,9 @@
+{
+  "description": "BUY 10 @100 then SELL 3 @110 — partial close (avg stays 100)",
+  "steps": [
+    { "type": "setQuote", "symbol": "AAPL", "price": 100 },
+    { "type": "placeOrder", "contract": { "aliceId": "mock-paper|AAPL", "symbol": "AAPL", "secType": "STK", "exchange": "MOCK", "currency": "USD" }, "order": { "action": "BUY", "orderType": "MKT", "totalQuantity": "10" } },
+    { "type": "setQuote", "symbol": "AAPL", "price": 110 },
+    { "type": "placeOrder", "contract": { "aliceId": "mock-paper|AAPL", "symbol": "AAPL", "secType": "STK", "exchange": "MOCK", "currency": "USD" }, "order": { "action": "SELL", "orderType": "MKT", "totalQuantity": "3" } }
+  ]
+}
