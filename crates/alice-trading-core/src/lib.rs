@@ -21,6 +21,9 @@ pub mod wire_schema;
 #[macro_use]
 extern crate napi_derive;
 
+#[cfg(feature = "napi-binding")]
+pub mod napi_binding;
+
 /// Smoke-test entry point. Returns a static string so Phase 3(d)'s parity script
 /// can confirm the binding loaded.
 #[cfg_attr(feature = "napi-binding", napi)]
