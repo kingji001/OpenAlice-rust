@@ -33,7 +33,7 @@ fn all_v2_fixtures_verify() {
     let mut paths: Vec<PathBuf> = entries
         .into_iter()
         .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| p.extension().map_or(false, |e| e == "json"))
+        .filter(|p| p.extension().is_some_and(|e| e == "json"))
         .collect();
     paths.sort();
     assert!(

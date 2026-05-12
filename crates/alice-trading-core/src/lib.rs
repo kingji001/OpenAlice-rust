@@ -6,9 +6,11 @@
 
 pub mod canonical;
 pub mod decimal;
+pub mod git;
 pub mod hash_v2;
 pub mod operation_wire;
 pub mod persisted_commit;
+pub mod types;
 pub mod wire_schema;
 
 #[cfg(feature = "napi-binding")]
