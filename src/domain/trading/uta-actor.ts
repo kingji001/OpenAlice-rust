@@ -131,10 +131,25 @@ export class TsUtaActor {
   private async runLoop(): Promise<void> {
     while (!this.stopped) {
       const queued = await this.queue.pop()
+      // reentrancyDepth is elevated only for the synchronous dispatch() call so
+      // that _doFoo methods which call actor.send() synchronously are caught
+      // (they would deadlock — the actor cannot process the queued command
+      // while it is already mid-dispatch). We decrement before the async await
+      // so that legitimate external callers can queue new commands while the
+      // actor is waiting for the current async operation to complete.
       this.reentrancyDepth++
+      let work: Promise<unknown>
+      try {
+        work = Promise.resolve(this.dispatch(queued.cmd))
+      } catch (e) {
+        this.reentrancyDepth--
+        queued.reject(e)
+        continue
+      }
+      this.reentrancyDepth--
+
       let timeoutId: ReturnType<typeof setTimeout> | undefined
       try {
-        const work = Promise.resolve(this.dispatch(queued.cmd))
         const result = queued.timeoutMs
           ? await Promise.race([
               work,
@@ -151,7 +166,6 @@ export class TsUtaActor {
         queued.reject(e)
       } finally {
         if (timeoutId !== undefined) clearTimeout(timeoutId)
-        this.reentrancyDepth--
       }
     }
   }

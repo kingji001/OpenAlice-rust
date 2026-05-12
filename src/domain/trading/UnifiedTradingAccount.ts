@@ -189,7 +189,11 @@ export class UnifiedTradingAccount {
   }
 
   /** Await initial broker connection. Resolves on success, rejects on failure. */
-  waitForConnect(): Promise<void> {
+  async waitForConnect(): Promise<void> {
+    return this.actor.send<void>({ type: 'waitForConnect' })
+  }
+
+  _doWaitForConnect(): Promise<void> {
     return this._connectPromise
   }
 
@@ -560,7 +564,11 @@ export class UnifiedTradingAccount {
     return this.git.getPendingOrderIds()
   }
 
-  simulatePriceChange(priceChanges: PriceChangeInput[]): Promise<SimulatePriceChangeResult> {
+  async simulatePriceChange(priceChanges: PriceChangeInput[]): Promise<SimulatePriceChangeResult> {
+    return this.actor.send<SimulatePriceChangeResult>({ type: 'simulatePriceChange', priceChanges })
+  }
+
+  _doSimulatePriceChange(priceChanges: PriceChangeInput[]): Promise<SimulatePriceChangeResult> {
     return this.git.simulatePriceChange(priceChanges)
   }
 
@@ -574,33 +582,57 @@ export class UnifiedTradingAccount {
 
   // ==================== Broker queries (delegation) ====================
 
-  getAccount(): Promise<AccountInfo> {
+  async getAccount(): Promise<AccountInfo> {
+    return this.actor.send<AccountInfo>({ type: 'getAccount' })
+  }
+
+  async _doGetAccount(): Promise<AccountInfo> {
     return this._callBroker(() => this.broker.getAccount())
   }
 
   async getPositions(): Promise<Position[]> {
+    return this.actor.send<Position[]>({ type: 'getPositions' })
+  }
+
+  async _doGetPositions(): Promise<Position[]> {
     const positions = await this._callBroker(() => this.broker.getPositions())
     for (const p of positions) this.stampAliceId(p.contract)
     return positions
   }
 
   async getOrders(orderIds: string[]): Promise<OpenOrder[]> {
+    return this.actor.send<OpenOrder[]>({ type: 'getOrders', orderIds })
+  }
+
+  async _doGetOrders(orderIds: string[]): Promise<OpenOrder[]> {
     const orders = await this._callBroker(() => this.broker.getOrders(orderIds))
     for (const o of orders) this.stampAliceId(o.contract)
     return orders
   }
 
   async getQuote(contract: Contract): Promise<Quote> {
+    return this.actor.send<Quote>({ type: 'getQuote', contract })
+  }
+
+  async _doGetQuote(contract: Contract): Promise<Quote> {
     const quote = await this._callBroker(() => this.broker.getQuote(contract))
     this.stampAliceId(quote.contract)
     return quote
   }
 
-  getMarketClock(): Promise<MarketClock> {
+  async getMarketClock(): Promise<MarketClock> {
+    return this.actor.send<MarketClock>({ type: 'getMarketClock' })
+  }
+
+  _doGetMarketClock(): Promise<MarketClock> {
     return this._callBroker(() => this.broker.getMarketClock())
   }
 
   async searchContracts(pattern: string): Promise<ContractDescription[]> {
+    return this.actor.send<ContractDescription[]>({ type: 'searchContracts', pattern })
+  }
+
+  async _doSearchContracts(pattern: string): Promise<ContractDescription[]> {
     const results = await this._callBroker(() => this.broker.searchContracts(pattern))
     for (const desc of results) this.stampAliceId(desc.contract)
     return results
@@ -614,11 +646,19 @@ export class UnifiedTradingAccount {
    * failed to refresh.
    */
   async refreshCatalog(): Promise<void> {
+    return this.actor.send<void>({ type: 'refreshCatalog' })
+  }
+
+  async _doRefreshCatalog(): Promise<void> {
     if (typeof this.broker.refreshCatalog !== 'function') return
     await this._callBroker(() => this.broker.refreshCatalog!())
   }
 
   async getContractDetails(query: Contract): Promise<ContractDetails | null> {
+    return this.actor.send<ContractDetails | null>({ type: 'getContractDetails', query })
+  }
+
+  async _doGetContractDetails(query: Contract): Promise<ContractDetails | null> {
     const details = await this._callBroker(() => this.broker.getContractDetails(query))
     if (details) this.stampAliceId(details.contract)
     return details
@@ -634,7 +674,11 @@ export class UnifiedTradingAccount {
 
   // ==================== State ====================
 
-  getState(): Promise<GitState> {
+  async getState(): Promise<GitState> {
+    return this.actor.send<GitState>({ type: 'getState' })
+  }
+
+  _doGetState(): Promise<GitState> {
     return this._getState()
   }
 

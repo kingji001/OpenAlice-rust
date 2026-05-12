@@ -255,7 +255,7 @@ describe('UTA — precision end-to-end', () => {
       totalQuantity: '10', lmtPrice: '145.25',
     })
     // Status before commit — staged ops only
-    const wire = JSON.parse(JSON.stringify(uta.status()))
+    const wire = JSON.parse(JSON.stringify(await uta.status()))
     const staged = wire.staged[0]
     expect(typeof staged.order.lmtPrice).toBe('string')
     expect(staged.order.lmtPrice).toBe('145.25')
