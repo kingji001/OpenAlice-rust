@@ -187,11 +187,15 @@ impl UtaActor {
             .await
             .map_err(|e| BrokerError::new(BrokerErrorCode::Unknown, e))?;
 
-        // 4. Track health based on operation outcomes.
-        let any_failure = !push_result.rejected.is_empty();
-        if !any_failure {
-            self.state.health.on_success();
-        }
+        // 4. Health is intentionally NOT updated here. Per-op rejections
+        //    (failures within the push batch) are not broker-level failures
+        //    — they're order-level outcomes. TS UnifiedTradingAccount._doPush
+        //    similarly never touches health; broker-level health transitions
+        //    happen only in _callBroker (broker-RPC wrapper, not present in
+        //    Rust yet — Phase 4d Task D scope). Phase 4d intentionally keeps
+        //    the actor's health untouched on push to match TS semantics.
+        //    Phase 4f will wire health updates through the actual broker
+        //    RPC layer (BrokerError → on_failure; success returns → on_success).
 
         // 5. Persist commit atomically. Persist failures are logged but do not
         //    fail the push — matches TS behavior.
