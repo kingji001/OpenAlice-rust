@@ -53,11 +53,11 @@ describe('UTAManager', () => {
   // ==================== listUTAs ====================
 
   describe('listUTAs', () => {
-    it('returns summaries of all accounts', () => {
+    it('returns summaries of all accounts', async () => {
       manager.add(makeUta(new MockBroker({ id: 'a1', label: 'Paper' })))
       manager.add(makeUta(new MockBroker({ id: 'a2', label: 'Bybit' })))
 
-      const list = manager.listUTAs()
+      const list = await manager.listUTAs()
       expect(list).toHaveLength(2)
       expect(list[0].id).toBe('a1')
       expect(list[1].id).toBe('a2')

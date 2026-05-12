@@ -206,7 +206,11 @@ export class UnifiedTradingAccount {
     return this._disabled
   }
 
-  getHealthInfo(): BrokerHealthInfo {
+  async getHealthInfo(): Promise<BrokerHealthInfo> {
+    return this.actor.send<BrokerHealthInfo>({ type: 'getHealthInfo' })
+  }
+
+  _doGetHealthInfo(): BrokerHealthInfo {
     return {
       status: this.health,
       consecutiveFailures: this._consecutiveFailures,
@@ -263,7 +267,7 @@ export class UnifiedTradingAccount {
   }
 
   private _emitHealthChange(): void {
-    this._onHealthChange?.(this.id, this.getHealthInfo())
+    this._onHealthChange?.(this.id, this._doGetHealthInfo())
   }
 
   private _onSuccess(): void {
@@ -475,15 +479,27 @@ export class UnifiedTradingAccount {
 
   // ==================== Git queries ====================
 
-  log(options?: { limit?: number; symbol?: string }): CommitLogEntry[] {
+  async log(options?: { limit?: number; symbol?: string }): Promise<CommitLogEntry[]> {
+    return this.actor.send<CommitLogEntry[]>({ type: 'log', options })
+  }
+
+  _doLog(options?: { limit?: number; symbol?: string }): CommitLogEntry[] {
     return this.git.log(options)
   }
 
-  show(hash: string): GitCommit | null {
+  async show(hash: string): Promise<GitCommit | null> {
+    return this.actor.send<GitCommit | null>({ type: 'show', hash })
+  }
+
+  _doShow(hash: string): GitCommit | null {
     return this.git.show(hash)
   }
 
-  status(): GitStatus {
+  async status(): Promise<GitStatus> {
+    return this.actor.send<GitStatus>({ type: 'status' })
+  }
+
+  _doStatus(): GitStatus {
     return this.git.status()
   }
 
@@ -536,7 +552,11 @@ export class UnifiedTradingAccount {
     return this.git.sync(updates, state)
   }
 
-  getPendingOrderIds(): Array<{ orderId: string; symbol: string }> {
+  async getPendingOrderIds(): Promise<Array<{ orderId: string; symbol: string }>> {
+    return this.actor.send<Array<{ orderId: string; symbol: string }>>({ type: 'getPendingOrderIds' })
+  }
+
+  _doGetPendingOrderIds(): Array<{ orderId: string; symbol: string }> {
     return this.git.getPendingOrderIds()
   }
 
@@ -604,7 +624,11 @@ export class UnifiedTradingAccount {
     return details
   }
 
-  getCapabilities(): AccountCapabilities {
+  async getCapabilities(): Promise<AccountCapabilities> {
+    return this.actor.send<AccountCapabilities>({ type: 'getCapabilities' })
+  }
+
+  _doGetCapabilities(): AccountCapabilities {
     return this.broker.getCapabilities()
   }
 
@@ -614,7 +638,11 @@ export class UnifiedTradingAccount {
     return this._getState()
   }
 
-  exportGitState(): GitExportState {
+  async exportGitState(): Promise<GitExportState> {
+    return this.actor.send<GitExportState>({ type: 'exportGitState' })
+  }
+
+  _doExportGitState(): GitExportState {
     return this.git.exportState()
   }
 

@@ -30,8 +30,8 @@ describe('UTA health — initial connect', () => {
     await flush()
 
     expect(uta.health).toBe('healthy')
-    expect(uta.getHealthInfo().lastSuccessAt).toBeInstanceOf(Date)
-    expect(uta.getHealthInfo().recovering).toBe(false)
+    expect((await uta.getHealthInfo()).lastSuccessAt).toBeInstanceOf(Date)
+    expect((await uta.getHealthInfo()).recovering).toBe(false)
   })
 
   it('goes offline when broker.init() fails at startup', async () => {
@@ -41,8 +41,8 @@ describe('UTA health — initial connect', () => {
     await flush()
 
     expect(uta.health).toBe('offline')
-    expect(uta.getHealthInfo().recovering).toBe(true)
-    expect(uta.getHealthInfo().lastError).toContain('simulated init failure')
+    expect((await uta.getHealthInfo()).recovering).toBe(true)
+    expect((await uta.getHealthInfo()).lastError).toContain('simulated init failure')
     await uta.close()
   })
 })
@@ -63,7 +63,7 @@ describe('UTA health — auto-recovery from initial connect failure', () => {
     await vi.advanceTimersByTimeAsync(5_000)
 
     expect(uta.health).toBe('healthy')
-    expect(uta.getHealthInfo().recovering).toBe(false)
+    expect((await uta.getHealthInfo()).recovering).toBe(false)
   })
 
   it('retries with exponential backoff when broker stays down', async () => {
@@ -85,7 +85,7 @@ describe('UTA health — auto-recovery from initial connect failure', () => {
     // 3rd recovery at 20s — still fails
     await vi.advanceTimersByTimeAsync(20_000)
     expect(uta.health).toBe('offline')
-    expect(uta.getHealthInfo().recovering).toBe(true)
+    expect((await uta.getHealthInfo()).recovering).toBe(true)
 
     await uta.close()
   })
@@ -136,7 +136,7 @@ describe('UTA health — runtime disconnect and recovery', () => {
     }
 
     expect(uta.health).toBe('offline')
-    expect(uta.getHealthInfo().recovering).toBe(true)
+    expect((await uta.getHealthInfo()).recovering).toBe(true)
     await uta.close()
   })
 
@@ -155,7 +155,7 @@ describe('UTA health — runtime disconnect and recovery', () => {
     await vi.advanceTimersByTimeAsync(5_000)
 
     expect(uta.health).toBe('healthy')
-    expect(uta.getHealthInfo().recovering).toBe(false)
+    expect((await uta.getHealthInfo()).recovering).toBe(false)
   })
 
   it('any successful call resets to healthy', async () => {
@@ -171,7 +171,7 @@ describe('UTA health — runtime disconnect and recovery', () => {
     // failMode exhausted — next call succeeds
     await uta.getAccount()
     expect(uta.health).toBe('healthy')
-    expect(uta.getHealthInfo().consecutiveFailures).toBe(0)
+    expect((await uta.getHealthInfo()).consecutiveFailures).toBe(0)
   })
 
   it('tracks failures across different broker methods', async () => {
@@ -181,7 +181,7 @@ describe('UTA health — runtime disconnect and recovery', () => {
     broker.setFailMode(2)
     await expect(uta.getAccount()).rejects.toThrow()
     await expect(uta.getPositions()).rejects.toThrow()
-    expect(uta.getHealthInfo().consecutiveFailures).toBe(2)
+    expect((await uta.getHealthInfo()).consecutiveFailures).toBe(2)
 
     await uta.getMarketClock()
     expect(uta.health).toBe('healthy')
@@ -251,8 +251,8 @@ describe('UTA health — close() cleanup', () => {
     const { uta } = createUTA(broker)
     await flush()
 
-    expect(uta.getHealthInfo().recovering).toBe(true)
+    expect((await uta.getHealthInfo()).recovering).toBe(true)
     await uta.close()
-    expect(uta.getHealthInfo().recovering).toBe(false)
+    expect((await uta.getHealthInfo()).recovering).toBe(false)
   })
 })

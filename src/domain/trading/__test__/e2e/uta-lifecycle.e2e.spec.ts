@@ -159,7 +159,7 @@ describe('UTA — full trading lifecycle', () => {
     await uta.commit('close AAPL')
     await uta.push()
 
-    const history = uta.log()
+    const history = await uta.log()
     expect(history).toHaveLength(2)
     expect(history[0].message).toBe('close AAPL')
     expect(history[1].message).toBe('buy AAPL')

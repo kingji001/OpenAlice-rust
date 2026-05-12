@@ -250,7 +250,7 @@ If this tool returns an error with transient=true, wait a few seconds and retry 
         if (targets.length === 0) return []
         try {
           const summaries = (await Promise.all(targets.map(async (uta) => {
-            const ids = orderIds ?? uta.getPendingOrderIds().map(p => p.orderId)
+            const ids = orderIds ?? (await uta.getPendingOrderIds()).map(p => p.orderId)
             const orders = await uta.getOrders(ids)
             return orders.map((o, i) => summarizeOrder(o, uta.id, ids[i]))
           }))).flat()
@@ -316,11 +316,11 @@ IMPORTANT: Check this BEFORE making new trading decisions.`,
         limit: z.number().int().positive().optional().describe('Number of recent commits (default: 10)'),
         symbol: z.string().optional().describe('Filter commits by symbol'),
       }),
-      execute: ({ source, limit, symbol }) => {
+      execute: async ({ source, limit, symbol }) => {
         const targets = manager.resolve(source)
         const allEntries: Array<Record<string, unknown>> = []
         for (const uta of targets) {
-          for (const entry of uta.log({ limit, symbol })) allEntries.push({ source: uta.id, ...entry })
+          for (const entry of await uta.log({ limit, symbol })) allEntries.push({ source: uta.id, ...entry })
         }
         allEntries.sort((a, b) => new Date(b.timestamp as string).getTime() - new Date(a.timestamp as string).getTime())
         return limit ? allEntries.slice(0, limit) : allEntries
@@ -330,9 +330,9 @@ IMPORTANT: Check this BEFORE making new trading decisions.`,
     tradingShow: tool({
       description: 'View details of a specific trading commit (like "git show <hash>").',
       inputSchema: z.object({ hash: z.string().describe('Commit hash (8 characters)') }),
-      execute: ({ hash }) => {
+      execute: async ({ hash }) => {
         for (const uta of manager.resolve()) {
-          const commit = uta.show(hash)
+          const commit = await uta.show(hash)
           if (commit) return { source: uta.id, ...commit }
         }
         return { error: `Commit ${hash} not found in any account` }
@@ -342,9 +342,9 @@ IMPORTANT: Check this BEFORE making new trading decisions.`,
     tradingStatus: tool({
       description: 'View current trading staging area status (like "git status").',
       inputSchema: z.object({ source: z.string().optional().describe(sourceDesc(false)) }),
-      execute: ({ source }) => {
+      execute: async ({ source }) => {
         const targets = manager.resolve(source)
-        const results = targets.map((uta) => ({ source: uta.id, ...uta.status() }))
+        const results = await Promise.all(targets.map(async (uta) => ({ source: uta.id, ...await uta.status() })))
         return results.length === 1 ? results[0] : results
       },
     }),
@@ -457,7 +457,7 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
         const targets = manager.resolve(source)
         const results: Array<Record<string, unknown>> = []
         for (const uta of targets) {
-          if (uta.status().staged.length === 0) continue
+          if ((await uta.status()).staged.length === 0) continue
           results.push({ source: uta.id, ...await uta.commit(message) })
         }
         if (results.length === 0) return { message: 'No staged operations to commit.' }
@@ -472,22 +472,23 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
       }),
       execute: async ({ source }) => {
         const targets = manager.resolve(source)
-        const pending = targets.filter(uta => uta.status().pendingMessage)
+        const statuses = await Promise.all(targets.map(async (uta) => ({ uta, st: await uta.status() })))
+        const pending = statuses.filter(({ st }) => st.pendingMessage)
         if (pending.length === 0) {
-          const uncommitted = targets.filter(uta => uta.status().staged.length > 0)
+          const uncommitted = statuses.filter(({ st }) => st.staged.length > 0)
           if (uncommitted.length > 0) {
             return {
               error: 'You have staged operations that are NOT committed yet. Call tradingCommit first, then tradingPush.',
-              uncommitted: uncommitted.map(uta => ({ source: uta.id, staged: uta.status().staged })),
+              uncommitted: uncommitted.map(({ uta, st }) => ({ source: uta.id, staged: st.staged })),
             }
           }
           return { message: 'No committed operations to push.' }
         }
         return {
           message: 'Push requires manual approval. The user can approve pending operations from any connected channel (Web UI, Telegram /trading, etc).',
-          pending: pending.map(uta => ({
+          pending: pending.map(({ uta, st }) => ({
             source: uta.id,
-            ...uta.status(),
+            ...st,
           })),
         }
       },
@@ -503,7 +504,7 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
         const targets = manager.resolve(source)
         const results: Array<Record<string, unknown>> = []
         for (const uta of targets) {
-          if (uta.getPendingOrderIds().length === 0) continue
+          if ((await uta.getPendingOrderIds()).length === 0) continue
           const result = await uta.sync({ delayMs })
           if (result.updatedCount > 0) results.push({ source: uta.id, ...result })
         }

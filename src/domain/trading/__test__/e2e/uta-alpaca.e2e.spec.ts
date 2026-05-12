@@ -71,7 +71,7 @@ describe('UTA — Alpaca order lifecycle', () => {
     expect(cancelPush.submitted).toHaveLength(1)
 
     // Verify log has 2 commits
-    expect(uta!.log().length).toBeGreaterThanOrEqual(2)
+    expect((await uta!.log()).length).toBeGreaterThanOrEqual(2)
   }, 30_000)
 })
 
@@ -188,6 +188,6 @@ describe('UTA — Alpaca fill flow (AAPL)', () => {
     const finalAaplQty = finalPositions.find(p => p.contract.symbol === 'AAPL')?.quantity.toNumber() ?? 0
     expect(finalAaplQty).toBe(initialAaplQty)
 
-    expect(uta!.log().length).toBeGreaterThanOrEqual(2)
+    expect((await uta!.log()).length).toBeGreaterThanOrEqual(2)
   }, 60_000)
 })

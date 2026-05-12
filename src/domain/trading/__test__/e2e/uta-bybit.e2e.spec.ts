@@ -113,7 +113,7 @@ describe('UTA — Bybit lifecycle (ETH perp)', () => {
     expect(Math.abs(finalEthQty - initialEthQty)).toBeLessThan(0.02)
 
     // === Log: 2 commits ===
-    const history = uta!.log()
+    const history = await uta!.log()
     console.log(`  log: ${history.length} commits — [${history.map(h => h.message).join(', ')}]`)
     expect(history.length).toBeGreaterThanOrEqual(2)
   }, 60_000)

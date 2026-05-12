@@ -14,8 +14,8 @@ function createUTA(broker?: MockBroker, options?: UnifiedTradingAccountOptions):
 }
 
 /** Helper: extract the first staged operation's placeOrder fields */
-function getStagedPlaceOrder(uta: UnifiedTradingAccount) {
-  const staged = uta.status().staged
+async function getStagedPlaceOrder(uta: UnifiedTradingAccount) {
+  const staged = (await uta.status()).staged
   expect(staged).toHaveLength(1)
   const op = staged[0] as Extract<Operation, { action: 'placeOrder' }>
   expect(op.action).toBe('placeOrder')
@@ -244,13 +244,13 @@ describe('UTA — stagePlaceOrder', () => {
 
   it('sets BUY action', async () => {
     await uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
-    const { order } = getStagedPlaceOrder(uta)
+    const { order } = await getStagedPlaceOrder(uta)
     expect(order.action).toBe('BUY')
   })
 
   it('sets SELL action', async () => {
     await uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'SELL', orderType: 'MKT', totalQuantity: '10' })
-    const { order } = getStagedPlaceOrder(uta)
+    const { order } = await getStagedPlaceOrder(uta)
     expect(order.action).toBe('SELL')
   })
 
@@ -259,48 +259,48 @@ describe('UTA — stagePlaceOrder', () => {
     for (const orderType of types) {
       const { uta: u } = createUTA()
       await u.stagePlaceOrder({ aliceId: 'mock-paper|X', action: 'BUY', orderType, totalQuantity: '1' })
-      const { order } = getStagedPlaceOrder(u)
+      const { order } = await getStagedPlaceOrder(u)
       expect(order.orderType).toBe(orderType)
     }
   })
 
   it('sets totalQuantity as Decimal', async () => {
     await uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '42' })
-    const { order } = getStagedPlaceOrder(uta)
+    const { order } = await getStagedPlaceOrder(uta)
     expect(order.totalQuantity).toBeInstanceOf(Decimal)
     expect(order.totalQuantity.toNumber()).toBe(42)
   })
 
   it('sets cashQty', async () => {
     await uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', cashQty: '5000' })
-    const { order } = getStagedPlaceOrder(uta)
+    const { order } = await getStagedPlaceOrder(uta)
     expect(order.cashQty.toNumber()).toBe(5000)
   })
 
   it('sets lmtPrice and auxPrice', async () => {
     await uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'STP LMT', totalQuantity: '10', lmtPrice: '150', auxPrice: '145' })
-    const { order } = getStagedPlaceOrder(uta)
+    const { order } = await getStagedPlaceOrder(uta)
     expect(order.lmtPrice.toNumber()).toBe(150)
     expect(order.auxPrice.toNumber()).toBe(145)
   })
 
   it('auxPrice sets trailing offset for TRAIL orders', async () => {
     await uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'SELL', orderType: 'TRAIL', totalQuantity: '10', auxPrice: '5' })
-    const { order } = getStagedPlaceOrder(uta)
+    const { order } = await getStagedPlaceOrder(uta)
     expect(order.auxPrice.toNumber()).toBe(5)
     expect(order.orderType).toBe('TRAIL')
   })
 
   it('TRAIL order with trailStopPrice and auxPrice', async () => {
     await uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'SELL', orderType: 'TRAIL', totalQuantity: '10', trailStopPrice: '145', auxPrice: '5' })
-    const { order } = getStagedPlaceOrder(uta)
+    const { order } = await getStagedPlaceOrder(uta)
     expect(order.trailStopPrice.toNumber()).toBe(145)
     expect(order.auxPrice.toNumber()).toBe(5)
   })
 
   it('sets trailingPercent', async () => {
     await uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'SELL', orderType: 'TRAIL', totalQuantity: '10', trailingPercent: '2.5' })
-    const { order } = getStagedPlaceOrder(uta)
+    const { order } = await getStagedPlaceOrder(uta)
     expect(order.trailingPercent.toNumber()).toBe(2.5)
   })
 
@@ -309,7 +309,7 @@ describe('UTA — stagePlaceOrder', () => {
       aliceId: 'mock-paper|ETH', action: 'BUY', orderType: 'LMT',
       totalQuantity: '0.12345678', lmtPrice: '0.00001234',
     })
-    const { order } = getStagedPlaceOrder(uta)
+    const { order } = await getStagedPlaceOrder(uta)
     expect(order.totalQuantity.toFixed()).toBe('0.12345678')
     expect(order.lmtPrice.toFixed()).toBe('0.00001234')
   })
@@ -319,7 +319,7 @@ describe('UTA — stagePlaceOrder', () => {
       aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'LMT',
       totalQuantity: '10', lmtPrice: '145.25',
     })
-    const wire = JSON.parse(JSON.stringify(uta.status()))
+    const wire = JSON.parse(JSON.stringify(await uta.status()))
     const staged = wire.staged[0]
     expect(typeof staged.order.lmtPrice).toBe('string')
     expect(staged.order.lmtPrice).toBe('145.25')
@@ -328,39 +328,39 @@ describe('UTA — stagePlaceOrder', () => {
 
   it('defaults tif to DAY', async () => {
     await uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
-    const { order } = getStagedPlaceOrder(uta)
+    const { order } = await getStagedPlaceOrder(uta)
     expect(order.tif).toBe('DAY')
   })
 
   it('allows overriding tif', async () => {
     await uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '10', lmtPrice: '150', tif: 'GTC' })
-    const { order } = getStagedPlaceOrder(uta)
+    const { order } = await getStagedPlaceOrder(uta)
     expect(order.tif).toBe('GTC')
   })
 
   it('sets outsideRth', async () => {
     await uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '10', lmtPrice: '150', outsideRth: true })
-    const { order } = getStagedPlaceOrder(uta)
+    const { order } = await getStagedPlaceOrder(uta)
     expect(order.outsideRth).toBe(true)
   })
 
   it('sets aliceId and symbol on contract', async () => {
     await uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
-    const { contract } = getStagedPlaceOrder(uta)
+    const { contract } = await getStagedPlaceOrder(uta)
     expect(contract.aliceId).toBe('mock-paper|AAPL')
     expect(contract.symbol).toBe('AAPL')
   })
 
   it('sets tpsl with takeProfit only', async () => {
     await uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10', takeProfit: { price: '160' } })
-    const staged = uta.status().staged
+    const staged = (await uta.status()).staged
     const op = staged[0] as Extract<Operation, { action: 'placeOrder' }>
     expect(op.tpsl).toEqual({ takeProfit: { price: '160' }, stopLoss: undefined })
   })
 
   it('sets tpsl with stopLoss only', async () => {
     await uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10', stopLoss: { price: '140' } })
-    const staged = uta.status().staged
+    const staged = (await uta.status()).staged
     const op = staged[0] as Extract<Operation, { action: 'placeOrder' }>
     expect(op.tpsl).toEqual({ takeProfit: undefined, stopLoss: { price: '140' } })
   })
@@ -370,7 +370,7 @@ describe('UTA — stagePlaceOrder', () => {
       aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10',
       takeProfit: { price: '160' }, stopLoss: { price: '140', limitPrice: '139.50' },
     })
-    const staged = uta.status().staged
+    const staged = (await uta.status()).staged
     const op = staged[0] as Extract<Operation, { action: 'placeOrder' }>
     expect(op.tpsl).toEqual({
       takeProfit: { price: '160' },
@@ -380,7 +380,7 @@ describe('UTA — stagePlaceOrder', () => {
 
   it('omits tpsl when neither TP nor SL provided', async () => {
     await uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
-    const staged = uta.status().staged
+    const staged = (await uta.status()).staged
     const op = staged[0] as Extract<Operation, { action: 'placeOrder' }>
     expect(op.tpsl).toBeUndefined()
   })
@@ -397,7 +397,7 @@ describe('UTA — stageModifyOrder', () => {
 
   it('sets provided fields on Partial<Order>', async () => {
     await uta.stageModifyOrder({ orderId: 'ord-1', totalQuantity: '20', lmtPrice: '155', orderType: 'LMT', tif: 'GTC' })
-    const staged = uta.status().staged
+    const staged = (await uta.status()).staged
     expect(staged).toHaveLength(1)
     const op = staged[0] as Extract<Operation, { action: 'modifyOrder' }>
     expect(op.action).toBe('modifyOrder')
@@ -411,7 +411,7 @@ describe('UTA — stageModifyOrder', () => {
 
   it('omits fields not provided', async () => {
     await uta.stageModifyOrder({ orderId: 'ord-1', lmtPrice: '160' })
-    const staged = uta.status().staged
+    const staged = (await uta.status()).staged
     const op = staged[0] as Extract<Operation, { action: 'modifyOrder' }>
     expect(op.changes.lmtPrice!.toNumber()).toBe(160)
     expect(op.changes.totalQuantity).toBeUndefined()
@@ -431,7 +431,7 @@ describe('UTA — stageClosePosition', () => {
 
   it('stages with Decimal quantity when qty provided', async () => {
     await uta.stageClosePosition({ aliceId: 'mock-paper|AAPL', qty: '5' })
-    const staged = uta.status().staged
+    const staged = (await uta.status()).staged
     const op = staged[0] as Extract<Operation, { action: 'closePosition' }>
     expect(op.action).toBe('closePosition')
     expect(op.contract.aliceId).toBe('mock-paper|AAPL')
@@ -441,7 +441,7 @@ describe('UTA — stageClosePosition', () => {
 
   it('stages with undefined quantity for full close', async () => {
     await uta.stageClosePosition({ aliceId: 'mock-paper|AAPL' })
-    const staged = uta.status().staged
+    const staged = (await uta.status()).staged
     const op = staged[0] as Extract<Operation, { action: 'closePosition' }>
     expect(op.quantity).toBeUndefined()
   })
@@ -453,7 +453,7 @@ describe('UTA — stageCancelOrder', () => {
   it('stages cancelOrder with orderId', async () => {
     const { uta } = createUTA()
     await uta.stageCancelOrder({ orderId: 'ord-999' })
-    const staged = uta.status().staged
+    const staged = (await uta.status()).staged
     expect(staged).toHaveLength(1)
     const op = staged[0] as Extract<Operation, { action: 'cancelOrder' }>
     expect(op.action).toBe('cancelOrder')
@@ -495,7 +495,7 @@ describe('UTA — git flow', () => {
     await uta.commit('buy')
     await uta.push()
 
-    expect(uta.status().staged).toHaveLength(0)
+    expect((await uta.status()).staged).toHaveLength(0)
   })
 })
 
@@ -586,13 +586,13 @@ describe('UTA — constructor', () => {
     await original.commit('initial buy')
     await original.push()
 
-    const savedState = original.exportGitState()
-    expect(original.log()).toHaveLength(1)
+    const savedState = await original.exportGitState()
+    expect(await original.log()).toHaveLength(1)
 
     // Create new UTA from saved state
     const { uta: restored } = createUTA(undefined, { savedState })
-    expect(restored.log()).toHaveLength(1)
-    expect(restored.log()[0].message).toBe('initial buy')
+    expect(await restored.log()).toHaveLength(1)
+    expect((await restored.log())[0].message).toBe('initial buy')
   })
 })
 
@@ -611,7 +611,7 @@ describe('UTA — health tracking', () => {
     await flush()
 
     expect(uta.health).toBe('healthy')
-    expect(uta.getHealthInfo().lastSuccessAt).toBeInstanceOf(Date)
+    expect((await uta.getHealthInfo()).lastSuccessAt).toBeInstanceOf(Date)
   })
 
   it('goes offline and starts recovery when initial connect fails', async () => {
@@ -621,7 +621,7 @@ describe('UTA — health tracking', () => {
     await flush()
 
     expect(uta.health).toBe('offline')
-    expect(uta.getHealthInfo().recovering).toBe(true)
+    expect((await uta.getHealthInfo()).recovering).toBe(true)
     await uta.close()
   })
 
@@ -638,7 +638,7 @@ describe('UTA — health tracking', () => {
     await vi.advanceTimersByTimeAsync(5_000)
 
     expect(uta.health).toBe('healthy')
-    expect(uta.getHealthInfo().recovering).toBe(false)
+    expect((await uta.getHealthInfo()).recovering).toBe(false)
   })
 
   it('transitions healthy → degraded after 3 consecutive failures', async () => {
@@ -680,7 +680,7 @@ describe('UTA — health tracking', () => {
     // Next call succeeds (failMode exhausted)
     await uta.getAccount()
     expect(uta.health).toBe('healthy')
-    expect(uta.getHealthInfo().consecutiveFailures).toBe(0)
+    expect((await uta.getHealthInfo()).consecutiveFailures).toBe(0)
   })
 
   it('fails fast when offline and recovering', async () => {
@@ -693,7 +693,7 @@ describe('UTA — health tracking', () => {
       await expect(uta.getAccount()).rejects.toThrow()
     }
     expect(uta.health).toBe('offline')
-    expect(uta.getHealthInfo().recovering).toBe(true)
+    expect((await uta.getHealthInfo()).recovering).toBe(true)
 
     // Subsequent calls fail fast with offline message
     await expect(uta.getAccount()).rejects.toThrow(/offline and reconnecting/)
@@ -728,13 +728,13 @@ describe('UTA — health tracking', () => {
       await expect(uta.getAccount()).rejects.toThrow()
     }
     expect(uta.health).toBe('offline')
-    expect(uta.getHealthInfo().recovering).toBe(true)
+    expect((await uta.getHealthInfo()).recovering).toBe(true)
 
     // Broker is back (failMode exhausted) — advance timer to trigger recovery
     await vi.advanceTimersByTimeAsync(5_000)
 
     expect(uta.health).toBe('healthy')
-    expect(uta.getHealthInfo().recovering).toBe(false)
+    expect((await uta.getHealthInfo()).recovering).toBe(false)
   })
 
   it('close() cancels recovery timer', async () => {
@@ -743,9 +743,9 @@ describe('UTA — health tracking', () => {
     const { uta } = createUTA(broker)
     await flush()
 
-    expect(uta.getHealthInfo().recovering).toBe(true)
+    expect((await uta.getHealthInfo()).recovering).toBe(true)
     await uta.close()
-    expect(uta.getHealthInfo().recovering).toBe(false)
+    expect((await uta.getHealthInfo()).recovering).toBe(false)
   })
 
   it('getHealthInfo returns full snapshot', async () => {
@@ -753,7 +753,7 @@ describe('UTA — health tracking', () => {
     const { uta } = createUTA(broker)
     await flush()
 
-    const info = uta.getHealthInfo()
+    const info = await uta.getHealthInfo()
     expect(info.status).toBe('healthy')
     expect(info.consecutiveFailures).toBe(0)
     expect(info.lastSuccessAt).toBeInstanceOf(Date)
@@ -768,7 +768,7 @@ describe('UTA — health tracking', () => {
 
     await expect(uta.getAccount()).rejects.toThrow()
     await expect(uta.getPositions()).rejects.toThrow()
-    expect(uta.getHealthInfo().consecutiveFailures).toBe(2)
+    expect((await uta.getHealthInfo()).consecutiveFailures).toBe(2)
 
     // Success on a different method resets
     await uta.getMarketClock()

@@ -151,7 +151,7 @@ export class TelegramPlugin implements Plugin {
           } else if (action === 'push' || action === 'reject') {
             const uta = engineCtx.utaManager.get(accountId)
             if (!uta) { await ctx.answerCallbackQuery({ text: 'Account not found' }); return }
-            const status = uta.status()
+            const status = await uta.status()
             if (!status.pendingMessage) {
               await ctx.answerCallbackQuery({ text: 'No pending commit' })
               // Refresh panel
@@ -473,7 +473,7 @@ export class TelegramPlugin implements Plugin {
 
     for (const uta of accounts) {
       const healthIcon = uta.health === 'healthy' ? '🟢' : uta.health === 'degraded' ? '🟡' : '🔴'
-      const gitStatus = uta.status()
+      const gitStatus = await uta.status()
       const pendingTag = gitStatus.pendingMessage ? '  ⏳ pending' : ''
       let equityStr = ''
       try {
@@ -492,7 +492,7 @@ export class TelegramPlugin implements Plugin {
     if (!uta) return { text: 'Account not found.', keyboard: new InlineKeyboard() }
 
     const healthIcon = uta.health === 'healthy' ? '🟢' : uta.health === 'degraded' ? '🟡' : '🔴'
-    const gitStatus = uta.status()
+    const gitStatus = await uta.status()
     const lines: string[] = [`Trading · ${uta.label} ${healthIcon}`]
 
     // Account info
@@ -526,7 +526,7 @@ export class TelegramPlugin implements Plugin {
     }
 
     // Recent history
-    const commits = uta.log({ limit: 3 })
+    const commits = await uta.log({ limit: 3 })
     if (commits.length > 0) {
       lines.push('')
       lines.push('History:')

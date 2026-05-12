@@ -186,13 +186,13 @@ export class UTAManager {
     return this.entries.get(id)
   }
 
-  listUTAs(): UTASummary[] {
-    return Array.from(this.entries.values()).map((uta) => ({
+  async listUTAs(): Promise<UTASummary[]> {
+    return Promise.all(Array.from(this.entries.values()).map(async (uta) => ({
       id: uta.id,
       label: uta.label,
-      capabilities: uta.getCapabilities(),
-      health: uta.getHealthInfo(),
-    }))
+      capabilities: await uta.getCapabilities(),
+      health: await uta.getHealthInfo(),
+    })))
   }
 
   has(id: string): boolean {

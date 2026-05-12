@@ -92,7 +92,7 @@ describe('UTA — Bybit demo (ETH perp)', () => {
     expect(Math.abs(finalQty - initialQty)).toBeLessThan(0.02)
     console.log(`  final ETH qty=${finalQty} (initial=${initialQty})`)
 
-    const log = uta!.log({ limit: 10 })
+    const log = await uta!.log({ limit: 10 })
     expect(log.length).toBeGreaterThanOrEqual(2)
     console.log(`  log: ${log.length} commits`)
   }, 60_000)
@@ -140,7 +140,7 @@ describe('UTA — Bybit demo (ETH perp)', () => {
     expect(commitResult.prepared).toBe(true)
 
     // Verify staging has content
-    const statusBefore = uta!.status()
+    const statusBefore = await uta!.status()
     expect(statusBefore.staged).toHaveLength(1)
     expect(statusBefore.pendingMessage).toBe('e2e: buy to be rejected')
 
@@ -151,17 +151,17 @@ describe('UTA — Bybit demo (ETH perp)', () => {
     expect(rejectResult.message).toContain('user declined')
 
     // Verify staging is cleared
-    const statusAfter = uta!.status()
+    const statusAfter = await uta!.status()
     expect(statusAfter.staged).toHaveLength(0)
     expect(statusAfter.pendingMessage).toBeNull()
 
     // Verify commit is in history with user-rejected status
-    const log = uta!.log({ limit: 5 })
+    const log = await uta!.log({ limit: 5 })
     const rejectedCommit = log.find(c => c.hash === rejectResult.hash)
     expect(rejectedCommit).toBeDefined()
     expect(rejectedCommit!.operations[0].status).toBe('user-rejected')
 
-    const fullCommit = uta!.show(rejectResult.hash)
+    const fullCommit = await uta!.show(rejectResult.hash)
     expect(fullCommit!.results[0].status).toBe('user-rejected')
     expect(fullCommit!.results[0].error).toBe('user declined')
   }, 30_000)
@@ -175,7 +175,7 @@ describe('UTA — Bybit demo (ETH perp)', () => {
     expect(result.message).toContain('[rejected]')
     expect(result.message).not.toContain('—')
 
-    const fullCommit = uta!.show(result.hash)
+    const fullCommit = await uta!.show(result.hash)
     expect(fullCommit!.results[0].error).toBe('Rejected by user')
   }, 15_000)
 })

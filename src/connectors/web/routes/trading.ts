@@ -119,7 +119,7 @@ async function queryAccount<T>(
     account.nudgeRecovery()
     return c.json({
       error: 'Account temporarily unavailable',
-      health: account.getHealthInfo(),
+      health: await account.getHealthInfo(),
     }, 503)
   }
   try {
@@ -140,8 +140,8 @@ export function createTradingRoutes(ctx: EngineContext) {
 
   // ==================== UTA listing ====================
 
-  app.get('/uta', (c) => {
-    return c.json({ utas: ctx.utaManager.listUTAs() })
+  app.get('/uta', async (c) => {
+    return c.json({ utas: await ctx.utaManager.listUTAs() })
   })
 
   // ==================== Aggregated equity ====================
@@ -159,7 +159,7 @@ export function createTradingRoutes(ctx: EngineContext) {
   app.get('/contracts/search', async (c) => {
     const pattern = (c.req.query('pattern') ?? c.req.query('query') ?? '').trim()
     if (!pattern) return c.json({ results: [], count: 0 })
-    const utas = ctx.utaManager.listUTAs()
+    const utas = await ctx.utaManager.listUTAs()
     if (utas.length === 0) {
       return c.json({ results: [], count: 0, utasConfigured: 0 })
     }
@@ -227,7 +227,7 @@ export function createTradingRoutes(ctx: EngineContext) {
     if (!account) return c.json({ error: 'Account not found' }, 404)
     return queryAccount(c, account, async () => {
       const idsParam = c.req.query('ids')
-      const orderIds = idsParam ? idsParam.split(',') : account.getPendingOrderIds().map(p => p.orderId)
+      const orderIds = idsParam ? idsParam.split(',') : (await account.getPendingOrderIds()).map(p => p.orderId)
       const orders = await account.getOrders(orderIds)
       return { orders }
     })
@@ -254,33 +254,33 @@ export function createTradingRoutes(ctx: EngineContext) {
 
   // ==================== Per-account wallet/git routes ====================
 
-  app.get('/uta/:id/wallet/log', (c) => {
+  app.get('/uta/:id/wallet/log', async (c) => {
     const uta = ctx.utaManager.get(c.req.param('id'))
     if (!uta) return c.json({ error: 'Account not found' }, 404)
     const limit = Number(c.req.query('limit')) || 20
     const symbol = c.req.query('symbol') || undefined
-    return c.json({ commits: uta.log({ limit, symbol }) })
+    return c.json({ commits: await uta.log({ limit, symbol }) })
   })
 
-  app.get('/uta/:id/wallet/show/:hash', (c) => {
+  app.get('/uta/:id/wallet/show/:hash', async (c) => {
     const uta = ctx.utaManager.get(c.req.param('id'))
     if (!uta) return c.json({ error: 'Account not found' }, 404)
-    const commit = uta.show(c.req.param('hash'))
+    const commit = await uta.show(c.req.param('hash'))
     if (!commit) return c.json({ error: 'Commit not found' }, 404)
     return c.json(commit)
   })
 
-  app.get('/uta/:id/wallet/status', (c) => {
+  app.get('/uta/:id/wallet/status', async (c) => {
     const uta = ctx.utaManager.get(c.req.param('id'))
     if (!uta) return c.json({ error: 'Account not found' }, 404)
-    return c.json(uta.status())
+    return c.json(await uta.status())
   })
 
   // Reject (records a user-rejected commit, clears staging)
   app.post('/uta/:id/wallet/reject', async (c) => {
     const uta = ctx.utaManager.get(c.req.param('id'))
     if (!uta) return c.json({ error: 'Account not found' }, 404)
-    if (!uta.status().pendingMessage) return c.json({ error: 'Nothing to reject' }, 400)
+    if (!(await uta.status()).pendingMessage) return c.json({ error: 'Nothing to reject' }, 400)
     try {
       const body = await c.req.json().catch(() => ({}))
       const reason = typeof body.reason === 'string' ? body.reason : undefined
@@ -295,7 +295,7 @@ export function createTradingRoutes(ctx: EngineContext) {
   app.post('/uta/:id/wallet/push', async (c) => {
     const uta = ctx.utaManager.get(c.req.param('id'))
     if (!uta) return c.json({ error: 'Account not found' }, 404)
-    if (!uta.status().pendingMessage) return c.json({ error: 'Nothing to push' }, 400)
+    if (!(await uta.status()).pendingMessage) return c.json({ error: 'Nothing to push' }, 400)
     try {
       const result = await uta.push()
       return c.json(result)
