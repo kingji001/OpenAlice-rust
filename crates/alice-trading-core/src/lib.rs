@@ -6,6 +6,10 @@
 
 pub mod canonical;
 pub mod decimal;
+pub mod hash_v2;
+pub mod operation_wire;
+pub mod persisted_commit;
+pub mod wire_schema;
 
 #[cfg(feature = "napi-binding")]
 #[macro_use]
