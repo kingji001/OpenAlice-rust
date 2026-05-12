@@ -1,14 +1,21 @@
 //! UtaActor — single-task per-UTA event loop. Phase 4d Task B:
 //! tokio::select! over cmd_rx + signal_rx. GetHealth and NudgeRecovery
-//! wired. Push/Reject/Sync scaffolded for Task D.
+//! wired. Phase 4d Task D wires Push/Reject/Sync to TradingGit + broker.
 
+use std::sync::Arc;
+
+use serde_json::Value;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 
 use crate::brokers::error::{BrokerError, BrokerErrorCode};
-use crate::brokers::types::BrokerHealthInfo;
-use crate::types::{AddResult, CommitPrepareResult, GitExportState, Operation};
-use crate::uta::command::{RecoverySignal, UtaCommand};
+use crate::brokers::traits::Broker;
+use crate::brokers::types::{BrokerHealth, BrokerHealthInfo};
+use crate::types::{
+    AddResult, CommitPrepareResult, GitExportState, GitState, Operation, OrderStatusUpdate,
+    PushResult, RejectResult, SyncResult,
+};
+use crate::uta::command::{RecoverySignal, UtaCommand, UtaEvent};
 use crate::uta::state::UtaState;
 
 pub struct UtaActor {
@@ -97,26 +104,20 @@ impl UtaActor {
                 let _ = reply.send(());
                 true
             }
-            // Task D fills in Push/Reject/Sync.
             UtaCommand::Push { reply } => {
-                let _ = reply.send(Err(BrokerError::new(
-                    BrokerErrorCode::Unknown,
-                    "Task D scaffold: Push not yet implemented".to_string(),
-                )));
+                let _ = reply.send(self.handle_push().await);
                 false
             }
-            UtaCommand::Reject { reply, .. } => {
-                let _ = reply.send(Err(BrokerError::new(
-                    BrokerErrorCode::Unknown,
-                    "Task D scaffold: Reject not yet implemented".to_string(),
-                )));
+            UtaCommand::Reject { reason, reply } => {
+                let _ = reply.send(self.handle_reject(reason).await);
                 false
             }
-            UtaCommand::Sync { reply, .. } => {
-                let _ = reply.send(Err(BrokerError::new(
-                    BrokerErrorCode::Unknown,
-                    "Task D scaffold: Sync not yet implemented".to_string(),
-                )));
+            UtaCommand::Sync {
+                updates,
+                current_state,
+                reply,
+            } => {
+                let _ = reply.send(self.handle_sync(updates, current_state).await);
                 false
             }
         }
@@ -151,6 +152,185 @@ impl UtaActor {
     fn handle_commit(&mut self, message: String) -> Result<CommitPrepareResult, String> {
         self.state.git.commit(message).map_err(|e| e.to_string())
     }
+
+    async fn handle_push(&mut self) -> Result<PushResult, BrokerError> {
+        // 1. Reject if disabled (mirrors TS UTA._doPush() permanent-config check).
+        if self.state.health.disabled {
+            return Err(BrokerError::new(
+                BrokerErrorCode::Config,
+                format!("Account \"{}\" is disabled", self.state.account_id),
+            ));
+        }
+        // 2. Reject if offline (mirrors TS UTA._doPush() health check).
+        if self.state.health.health() == BrokerHealth::Offline {
+            return Err(BrokerError::new(
+                BrokerErrorCode::Network,
+                format!("Account \"{}\" is offline", self.state.account_id),
+            ));
+        }
+
+        // 3. Run TradingGit push with an async per-op dispatcher closure.
+        let broker = self.state.broker.clone();
+        let dispatcher = move |op: &Operation| {
+            let broker = broker.clone();
+            let op = op.clone();
+            Box::pin(async move { broker_dispatch(&broker, &op).await })
+                as std::pin::Pin<
+                    Box<dyn std::future::Future<Output = Result<Value, String>> + Send>,
+                >
+        };
+
+        let push_result = self
+            .state
+            .git
+            .push_with_dispatcher(&dispatcher)
+            .await
+            .map_err(|e| BrokerError::new(BrokerErrorCode::Unknown, e))?;
+
+        // 4. Track health based on operation outcomes.
+        let any_failure = !push_result.rejected.is_empty();
+        if !any_failure {
+            self.state.health.on_success();
+        }
+
+        // 5. Persist commit atomically. Persist failures are logged but do not
+        //    fail the push — matches TS behavior.
+        let export = self.state.git.export_state();
+        if let Err(e) = crate::uta::persist::persist_commit_atomic(
+            &self.state.account_id,
+            &export,
+            &self.state.data_root,
+        )
+        .await
+        {
+            tracing::error!(
+                target: "uta",
+                account = %self.state.account_id,
+                error = %e,
+                "commit persist failed",
+            );
+        }
+
+        // 6. Emit commit.notify event if subscribed.
+        if let Some(tx) = &self.state.event_tx {
+            let _ = tx
+                .send(UtaEvent::CommitNotify {
+                    account_id: self.state.account_id.clone(),
+                    commit_hash: push_result.hash.clone(),
+                })
+                .await;
+        }
+
+        Ok(push_result)
+    }
+
+    async fn handle_reject(&mut self, reason: Option<String>) -> Result<RejectResult, BrokerError> {
+        // Reject builds a [rejected] commit without invoking the broker.
+        // Phase 2 dividend: v2 hash is recomputed with the [rejected]-prefixed
+        // message inside TradingGit::reject.
+        let reject_result = self
+            .state
+            .git
+            .reject(reason)
+            .map_err(|e| BrokerError::new(BrokerErrorCode::Unknown, e))?;
+
+        let export = self.state.git.export_state();
+        if let Err(e) = crate::uta::persist::persist_commit_atomic(
+            &self.state.account_id,
+            &export,
+            &self.state.data_root,
+        )
+        .await
+        {
+            tracing::error!(
+                target: "uta",
+                account = %self.state.account_id,
+                error = %e,
+                "reject persist failed",
+            );
+        }
+
+        if let Some(tx) = &self.state.event_tx {
+            let _ = tx
+                .send(UtaEvent::CommitNotify {
+                    account_id: self.state.account_id.clone(),
+                    commit_hash: reject_result.hash.clone(),
+                })
+                .await;
+        }
+
+        Ok(reject_result)
+    }
+
+    async fn handle_sync(
+        &mut self,
+        updates: Vec<OrderStatusUpdate>,
+        current_state: GitState,
+    ) -> Result<SyncResult, BrokerError> {
+        let result = self
+            .state
+            .git
+            .sync(updates, current_state)
+            .map_err(|e| BrokerError::new(BrokerErrorCode::Unknown, e))?;
+
+        let export = self.state.git.export_state();
+        if let Err(e) = crate::uta::persist::persist_commit_atomic(
+            &self.state.account_id,
+            &export,
+            &self.state.data_root,
+        )
+        .await
+        {
+            tracing::error!(
+                target: "uta",
+                account = %self.state.account_id,
+                error = %e,
+                "sync persist failed",
+            );
+        }
+
+        if let Some(tx) = &self.state.event_tx {
+            let _ = tx
+                .send(UtaEvent::CommitNotify {
+                    account_id: self.state.account_id.clone(),
+                    commit_hash: result.hash.clone(),
+                })
+                .await;
+        }
+
+        Ok(result)
+    }
+}
+
+/// Route an `Operation` to the appropriate `Broker` method and return the
+/// raw JSON-serialized result. Mirrors the TS dispatcher closure in
+/// `UnifiedTradingAccount.ts:153-166`.
+async fn broker_dispatch(broker: &Arc<dyn Broker>, op: &Operation) -> Result<Value, String> {
+    let result = match op {
+        Operation::PlaceOrder {
+            contract,
+            order,
+            tpsl,
+        } => broker
+            .place_order(contract, order, tpsl.as_ref())
+            .await
+            .map_err(|e| e.message)?,
+        Operation::ModifyOrder { order_id, changes } => broker
+            .modify_order(order_id, changes)
+            .await
+            .map_err(|e| e.message)?,
+        Operation::CancelOrder { order_id, .. } => {
+            broker.cancel_order(order_id).await.map_err(|e| e.message)?
+        }
+        Operation::ClosePosition { contract, quantity } => broker
+            .close_position(contract, quantity.as_deref())
+            .await
+            .map_err(|e| e.message)?,
+        Operation::SyncOrders => {
+            return Err("syncOrders dispatched via handle_sync".to_string());
+        }
+    };
+    serde_json::to_value(result).map_err(|e| e.to_string())
 }
 
 impl UtaHandle {
@@ -170,6 +350,47 @@ impl UtaHandle {
             .await
             .map_err(|_| "actor stopped".to_string())?;
         rx.await.map_err(|_| "actor reply dropped".to_string())?
+    }
+
+    pub async fn push(&self) -> Result<PushResult, BrokerError> {
+        let (tx, rx) = oneshot::channel();
+        self.cmd_tx
+            .send(UtaCommand::Push { reply: tx })
+            .await
+            .map_err(|_| BrokerError::new(BrokerErrorCode::Unknown, "actor stopped".to_string()))?;
+        rx.await.map_err(|_| {
+            BrokerError::new(BrokerErrorCode::Unknown, "actor reply dropped".to_string())
+        })?
+    }
+
+    pub async fn reject(&self, reason: Option<String>) -> Result<RejectResult, BrokerError> {
+        let (tx, rx) = oneshot::channel();
+        self.cmd_tx
+            .send(UtaCommand::Reject { reason, reply: tx })
+            .await
+            .map_err(|_| BrokerError::new(BrokerErrorCode::Unknown, "actor stopped".to_string()))?;
+        rx.await.map_err(|_| {
+            BrokerError::new(BrokerErrorCode::Unknown, "actor reply dropped".to_string())
+        })?
+    }
+
+    pub async fn sync(
+        &self,
+        updates: Vec<OrderStatusUpdate>,
+        current_state: GitState,
+    ) -> Result<SyncResult, BrokerError> {
+        let (tx, rx) = oneshot::channel();
+        self.cmd_tx
+            .send(UtaCommand::Sync {
+                updates,
+                current_state,
+                reply: tx,
+            })
+            .await
+            .map_err(|_| BrokerError::new(BrokerErrorCode::Unknown, "actor stopped".to_string()))?;
+        rx.await.map_err(|_| {
+            BrokerError::new(BrokerErrorCode::Unknown, "actor reply dropped".to_string())
+        })?
     }
 
     pub async fn export_state(&self) -> Result<GitExportState, String> {

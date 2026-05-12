@@ -15,6 +15,8 @@
 use crate::hash_v2::{generate_intent_hash_v2, HashV2Input};
 use crate::types::*;
 use serde_json::{json, Value};
+use std::future::Future;
+use std::pin::Pin;
 
 /// Closure type executing a single operation against the broker.
 pub type ExecuteOperationFn = Box<dyn Fn(&Operation) -> OperationResult + Send + Sync>;
@@ -197,6 +199,107 @@ impl TradingGit {
             timestamp,
             round: self.current_round,
             // INVARIANT 1: hash_version is None when v1 path → field absent in JSON.
+            hash_version: self.pending_v2.as_ref().map(|_| 2),
+            intent_full_hash: self.pending_v2.as_ref().map(|v| v.intent_full_hash.clone()),
+            hash_input_timestamp: self
+                .pending_v2
+                .as_ref()
+                .map(|v| v.hash_input_timestamp.clone()),
+            entry_hash_version: None,
+            entry_full_hash: None,
+        };
+
+        self.commits.push(commit);
+        self.head = Some(pending_hash.clone());
+
+        if let Some(cb) = &self.config.on_commit {
+            cb(&self.export_state());
+        }
+
+        // INVARIANT 3: clear pending state at end of push().
+        self.staging_area.clear();
+        self.pending_message = None;
+        self.pending_hash = None;
+        self.pending_v2 = None;
+
+        let submitted = results.iter().filter(|r| r.success).cloned().collect();
+        let rejected = results.iter().filter(|r| !r.success).cloned().collect();
+
+        Ok(PushResult {
+            hash: pending_hash,
+            message: pending_message,
+            operation_count: operations.len() as u32,
+            submitted,
+            rejected,
+        })
+    }
+
+    /// Async push variant — accepts an async dispatcher closure that returns a
+    /// raw broker payload (`serde_json::Value`) per operation. Mirrors the TS
+    /// `push()` flow (`TradingGit.ts:108-172`): execute each op, parse the
+    /// result with the IBKR-style status mapping, build the commit, fire
+    /// `on_commit`, clear staging.
+    ///
+    /// Phase 4d Task D — used by `UtaActor` so async broker calls compose with
+    /// the existing v2-hash machinery without forcing the sync
+    /// `execute_operation` callback to become async.
+    ///
+    /// The dispatcher returns `Result<Value, String>` so it can be backed by
+    /// any error type — `UtaActor` adapts `BrokerError` via `Display`.
+    pub async fn push_with_dispatcher<F>(&mut self, dispatcher: &F) -> Result<PushResult, String>
+    where
+        F: Fn(&Operation) -> Pin<Box<dyn Future<Output = Result<Value, String>> + Send>> + Sync,
+    {
+        if self.staging_area.is_empty() {
+            return Err("Nothing to push: staging area is empty".to_string());
+        }
+        let pending_message = self
+            .pending_message
+            .clone()
+            .ok_or("Nothing to push: please commit first")?;
+        let pending_hash = self
+            .pending_hash
+            .clone()
+            .ok_or("Nothing to push: please commit first")?;
+
+        let operations = self.staging_area.clone();
+        let mut results: Vec<OperationResult> = Vec::with_capacity(operations.len());
+        for op in &operations {
+            match dispatcher(op).await {
+                Ok(raw) => results.push(parse_broker_payload(op, raw)),
+                Err(err) => results.push(OperationResult {
+                    action: op.action_name().to_string(),
+                    success: false,
+                    order_id: None,
+                    status: OperationStatus::Rejected,
+                    execution: None,
+                    order_state: None,
+                    filled_qty: None,
+                    filled_price: None,
+                    error: Some(err),
+                    raw: None,
+                }),
+            }
+        }
+
+        let state_after = (self.config.get_git_state)();
+
+        // INVARIANT 2: timestamp == hash_input_timestamp for v2 commits.
+        let timestamp = self
+            .pending_v2
+            .as_ref()
+            .map(|v| v.hash_input_timestamp.clone())
+            .unwrap_or_else(now_iso);
+
+        let commit = GitCommit {
+            hash: pending_hash.clone(),
+            parent_hash: self.head.clone(),
+            message: pending_message.clone(),
+            operations: operations.clone(),
+            results: results.clone(),
+            state_after,
+            timestamp,
+            round: self.current_round,
             hash_version: self.pending_v2.as_ref().map(|_| 2),
             intent_full_hash: self.pending_v2.as_ref().map(|v| v.intent_full_hash.clone()),
             hash_input_timestamp: self
@@ -508,6 +611,85 @@ impl TradingGit {
             }
         }
         pending
+    }
+}
+
+/// Parse a raw broker payload (`PlaceOrderResult`-shaped JSON) into the
+/// commit-log `OperationResult`. Mirrors TS `parseOperationResult` +
+/// `mapOrderStatus` (`TradingGit.ts:621-667`).
+fn parse_broker_payload(op: &Operation, raw: Value) -> OperationResult {
+    let action = op.action_name().to_string();
+    if !raw.is_object() {
+        return OperationResult {
+            action,
+            success: false,
+            order_id: None,
+            status: OperationStatus::Rejected,
+            execution: None,
+            order_state: None,
+            filled_qty: None,
+            filled_price: None,
+            error: Some("Invalid response from trading engine".to_string()),
+            raw: Some(raw),
+        };
+    }
+    let success = raw
+        .get("success")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    if !success {
+        let err = raw
+            .get("error")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Unknown error")
+            .to_string();
+        return OperationResult {
+            action,
+            success: false,
+            order_id: None,
+            status: OperationStatus::Rejected,
+            execution: None,
+            order_state: None,
+            filled_qty: None,
+            filled_price: None,
+            error: Some(err),
+            raw: Some(raw),
+        };
+    }
+
+    let order_id = raw
+        .get("orderId")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+    let order_state = raw.get("orderState").cloned();
+    let execution = raw.get("execution").cloned();
+    let status = map_order_status(order_state.as_ref());
+
+    OperationResult {
+        action,
+        success: true,
+        order_id,
+        status,
+        execution,
+        order_state,
+        filled_qty: None,
+        filled_price: None,
+        error: None,
+        raw: Some(raw),
+    }
+}
+
+/// Map IBKR-style `OrderState.status` → `OperationStatus`.
+/// Mirrors TS `mapOrderStatus` (`TradingGit.ts:660-667`).
+fn map_order_status(order_state: Option<&Value>) -> OperationStatus {
+    let status = order_state
+        .and_then(|s| s.get("status"))
+        .and_then(|v| v.as_str());
+    match status {
+        Some("Filled") => OperationStatus::Filled,
+        Some("Cancelled") => OperationStatus::Cancelled,
+        Some("Inactive") => OperationStatus::Rejected,
+        _ => OperationStatus::Submitted,
     }
 }
 
