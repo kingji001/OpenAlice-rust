@@ -29,7 +29,7 @@ impl UtaState {
         guards: Vec<Box<dyn Guard>>,
         data_root: PathBuf,
     ) -> Self {
-        let commit_path = data_root.join(format!("trading/{}/commit.json", account_id));
+        let commit_path = crate::uta::persist::commit_path(&account_id, &data_root);
         let git_config = TradingGitConfig::stub();
         Self {
             account_id,
