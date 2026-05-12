@@ -34,3 +34,6 @@ packages/ibkr/ref/CMakeLists.txt
 
 # Turborepo
 .turbo/
+
+# Rust
+target/
