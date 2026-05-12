@@ -1,5 +1,5 @@
 import Decimal from 'decimal.js'
-import { UNSET_DECIMAL } from '@traderalice/ibkr'
+import { UNSET_DECIMAL } from '@traderalice/ibkr-types'
 import type { OperationGuard, GuardContext } from './types.js'
 
 const DEFAULT_MAX_PERCENT = 25

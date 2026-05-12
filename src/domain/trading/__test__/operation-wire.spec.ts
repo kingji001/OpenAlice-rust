@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js'
 import { describe, expect, it } from 'vitest'
-import { Contract, Order, OrderCancel } from '@traderalice/ibkr'
+import { Contract, Order, OrderCancel } from '@traderalice/ibkr-types'
 import { operationToWire } from '../git/operation-wire.js'
 import type { Operation } from '../git/types.js'
 

@@ -6,7 +6,7 @@
 
 import { createHash } from 'crypto'
 import Decimal from 'decimal.js'
-import { Order, UNSET_DECIMAL } from '@traderalice/ibkr'
+import { Order, UNSET_DECIMAL } from '@traderalice/ibkr-types'
 import { rehydrateCommit } from './_rehydrate.js'
 import { generateIntentHashV2 } from './hash-v2.js'
 import type { ITradingGit, TradingGitConfig } from './interfaces.js'

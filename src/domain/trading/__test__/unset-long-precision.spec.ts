@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js'
 import { describe, expect, it } from 'vitest'
-import { UNSET_LONG } from '@traderalice/ibkr'
+import { UNSET_LONG } from '@traderalice/ibkr-types'
 
 /**
  * UNSET_LONG precision check — Phase 1b deliverable 5.

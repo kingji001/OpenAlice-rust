@@ -42,7 +42,7 @@ export const INIT_RETRY_BASE_MS = 500
 
 // ==================== CCXT-specific types (not part of IBroker) ====================
 
-import type { Contract } from '@traderalice/ibkr'
+import type { Contract } from '@traderalice/ibkr-types'
 import type { Position } from '../types.js'
 
 /** Position with crypto-specific fields (leverage, margin, liquidation). */

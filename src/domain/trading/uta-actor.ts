@@ -11,7 +11,7 @@
  * Spec: docs/superpowers/specs/2026-05-12-phase-4a-uta-actor-retrofit-design.md
  */
 
-import type { Contract } from '@traderalice/ibkr'
+import type { Contract } from '@traderalice/ibkr-types'
 import type {
   StagePlaceOrderParams,
   StageModifyOrderParams,

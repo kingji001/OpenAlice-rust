@@ -2,10 +2,7 @@
  * Exchange-specific overrides for CcxtBroker.
  *
  * CCXT's "unified API" behaves differently across exchanges:
- * - Bybit: fetchOrder requires { acknowledged: true }, limited to last 500 orders
  * - Binance: fetchOrder works fine, but conditional orders need { stop: true }
- * - OKX/Bitget: no fetchOpenOrder/fetchClosedOrder singular methods
- * - Hyperliquid: market orders require a ref price, fetchPositions omits markPrice
  *
  * Each tested exchange gets its own override file in exchanges/. Only override
  * what's different — unset methods fall through to the default.
@@ -24,8 +21,6 @@
  */
 
 import type { Exchange, Order as CcxtOrder, Position as CcxtPosition } from 'ccxt'
-import { bybitOverrides } from './exchanges/bybit.js'
-import { hyperliquidOverrides } from './exchanges/hyperliquid.js'
 
 // ==================== Override interface ====================
 
@@ -49,8 +44,7 @@ export interface CcxtExchangeOverrides {
     defaultImpl: DefaultImpl<[Exchange, string, string | undefined], void>,
   ): Promise<void>
 
-  /** Place an order via ccxt.createOrder. Override when an exchange needs custom prep
-   *  (e.g. hyperliquid market orders require a reference price for slippage bounds). */
+  /** Place an order via ccxt.createOrder. Override when an exchange needs custom prep. */
   placeOrder?(
     exchange: Exchange,
     symbol: string,
@@ -65,8 +59,7 @@ export interface CcxtExchangeOverrides {
     >,
   ): Promise<CcxtOrder>
 
-  /** Fetch positions. Override when CCXT's parsePosition leaves important
-   *  fields undefined (e.g. hyperliquid omits markPrice). */
+  /** Fetch positions. Override when CCXT's parsePosition leaves important fields undefined. */
   fetchPositions?(
     exchange: Exchange,
     defaultImpl: DefaultImpl<[Exchange], CcxtPosition[]>,
@@ -75,7 +68,7 @@ export interface CcxtExchangeOverrides {
 
 // ==================== Default implementations ====================
 
-/** Default: fetchOrder + { stop: true } fallback. Works for binance, okx, bitget, etc. */
+/** Default: fetchOrder + { stop: true } fallback. Works for binance, etc. */
 export async function defaultFetchOrderById(exchange: Exchange, orderId: string, symbol: string): Promise<CcxtOrder> {
   try {
     return await exchange.fetchOrder(orderId, symbol)
@@ -102,7 +95,7 @@ export async function defaultCancelOrderById(exchange: Exchange, orderId: string
   }
 }
 
-/** Default: pass straight through to ccxt.createOrder. Works for bybit, binance, alpaca-via-ccxt, etc. */
+/** Default: pass straight through to ccxt.createOrder. */
 export async function defaultPlaceOrder(
   exchange: Exchange,
   symbol: string,
@@ -123,6 +116,6 @@ export async function defaultFetchPositions(exchange: Exchange): Promise<CcxtPos
 // ==================== Registry ====================
 
 export const exchangeOverrides: Record<string, CcxtExchangeOverrides> = {
-  bybit: bybitOverrides,
-  hyperliquid: hyperliquidOverrides,
+  // Binance uses defaults — no overrides needed yet.
+  // Add exchange-specific overrides here as needed.
 }

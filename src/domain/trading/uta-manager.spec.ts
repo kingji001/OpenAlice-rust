@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { ContractDescription } from '@traderalice/ibkr'
+import { ContractDescription } from '@traderalice/ibkr-types'
 import { UTAManager } from './uta-manager.js'
 import { UnifiedTradingAccount } from './UnifiedTradingAccount.js'
 import {

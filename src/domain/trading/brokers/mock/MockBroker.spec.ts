@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest'
 import Decimal from 'decimal.js'
-import { Contract, Order, OrderState } from '@traderalice/ibkr'
+import { Contract, Order, OrderState } from '@traderalice/ibkr-types'
 import { MockBroker, makeContract, makePosition, makeOpenOrder, makePlaceOrderResult } from './index.js'
 import '../../contract-ext.js'
 

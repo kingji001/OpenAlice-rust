@@ -5,7 +5,7 @@
  * No more Record<string, unknown> type erasure.
  */
 
-import type { Contract, Order, OrderCancel, Execution, OrderState } from '@traderalice/ibkr'
+import type { Contract, Order, OrderCancel, Execution, OrderState } from '@traderalice/ibkr-types'
 import type Decimal from 'decimal.js'
 import type { Position, OpenOrder, TpSlParams } from '../brokers/types.js'
 import '../contract-ext.js'

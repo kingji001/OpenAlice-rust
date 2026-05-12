@@ -138,12 +138,6 @@ const cryptoSchema = z.object({
 const securitiesSchema = z.object({
   provider: z.discriminatedUnion('type', [
     z.object({
-      type: z.literal('alpaca'),
-      apiKey: z.string().optional(),
-      secretKey: z.string().optional(),
-      paper: z.boolean().default(true),
-    }),
-    z.object({
       type: z.literal('none'),
     }),
   ]).default({ type: 'none' }),
@@ -308,11 +302,9 @@ export type UTAConfig = z.infer<typeof utaConfigSchema>
  */
 export const tradingCoreConfigSchema = z.object({
   defaultBrokerImpl: z.object({
-    alpaca: z.enum(['ts', 'rust']).default('ts'),
-    ibkr: z.enum(['ts', 'rust']).default('ts'),
     ccxt: z.literal('ts').default('ts'),  // pinned to TS — never migrates
     mock: z.enum(['ts', 'rust']).default('rust'),
-  }).default({ alpaca: 'ts', ibkr: 'ts', ccxt: 'ts', mock: 'rust' }),
+  }).default({ ccxt: 'ts', mock: 'rust' }),
   eventQueueCapacity: z.number().int().positive().default(1024),
   panicDisableThreshold: z.number().int().positive().default(5),
   dataRoot: z.string().default('./data'),

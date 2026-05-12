@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js'
 import { describe, expect, it } from 'vitest'
-import { Contract, Order } from '@traderalice/ibkr'
+import { Contract, Order } from '@traderalice/ibkr-types'
 import { generateIntentHashV2 } from '../git/hash-v2.js'
 import type { Operation } from '../git/types.js'
 

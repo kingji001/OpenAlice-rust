@@ -15,7 +15,7 @@
  * eyeball when a broker's data changes shape.
  */
 
-import { ContractDescription, Contract } from '@traderalice/ibkr'
+import { ContractDescription, Contract } from '@traderalice/ibkr-types'
 
 export interface FuzzyRankInput {
   /** Catalog entries to rank. Anything with at least a symbol works. */

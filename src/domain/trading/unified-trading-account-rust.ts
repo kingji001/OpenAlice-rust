@@ -21,8 +21,8 @@ import type {
   Position,
   Quote,
 } from './brokers/types.js'
-import type { ContractDescription } from '@traderalice/ibkr'
-import type { Contract } from '@traderalice/ibkr'
+import type { ContractDescription } from '@traderalice/ibkr-types'
+import type { Contract } from '@traderalice/ibkr-types'
 import type {
   AddResult,
   CommitPrepareResult,
@@ -529,9 +529,8 @@ export class RustUtaProxy {
   private _resolveAccountType(): string {
     const presetId = this.accountConfig.presetId ?? ''
     if (presetId.startsWith('mock')) return 'mock'
-    if (presetId.startsWith('alpaca')) return 'alpaca'
-    if (presetId.startsWith('ibkr')) return 'ibkr'
-    if (presetId.startsWith('bybit') || presetId.startsWith('okx') || presetId.startsWith('ccxt')) return 'ccxt'
+    // Any CCXT-backed preset (binance-cross-margin, ccxt-custom, etc.)
+    if (presetId.startsWith('binance') || presetId.startsWith('ccxt')) return 'ccxt'
     return 'mock'
   }
 

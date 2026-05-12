@@ -16,14 +16,8 @@ import {
   BROKER_PRESET_CATALOG,
   getBrokerPreset,
   isPaperPreset,
-  OKX_PRESET,
-  BYBIT_PRESET,
-  HYPERLIQUID_PRESET,
-  BITGET_PRESET,
-  ALPACA_PRESET,
-  IBKR_PRESET,
-  LONGBRIDGE_PRESET,
-  CCXT_CUSTOM_PRESET,
+  BINANCE_CROSS_MARGIN_PRESET,
+  MOCK_PAPER_PRESET,
 } from './preset-catalog.js'
 import { BROKER_ENGINE_REGISTRY } from './registry.js'
 import { BUILTIN_BROKER_PRESETS } from './presets.js'
@@ -32,18 +26,8 @@ import { BUILTIN_BROKER_PRESETS } from './presets.js'
 
 /** Minimal valid presetConfig for each preset id. Use to round-trip through schema + engine. */
 const SAMPLE_CONFIGS: Record<string, Record<string, unknown>> = {
-  okx:             { mode: 'live', apiKey: 'k', secret: 's', password: 'p' },
-  bybit:           { mode: 'live', apiKey: 'k', secret: 's' },
-  hyperliquid:     { mode: 'live', walletAddress: '0xabc', privateKey: 'pk' },
-  bitget:          { mode: 'live', apiKey: 'k', secret: 's', password: 'p' },
-  alpaca:          { mode: 'paper', apiKey: 'k', apiSecret: 's' },
-  'ibkr-tws':      { host: '127.0.0.1', port: 7497, clientId: 0 },
-  longbridge:      { mode: 'live', appKey: 'k', appSecret: 's', accessToken: 't' },
-  'ccxt-custom':   { exchange: 'kucoin', apiKey: 'k', secret: 's' },
-  'leverup-monad': {
-    mode: 'testnet',
-    privateKey: '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d',
-  },
+  'binance-cross-margin': { apiKey: 'k', secret: 's' },
+  'mock-paper':           {},
 }
 
 // ==================== Catalog integrity ====================
@@ -52,6 +36,11 @@ describe('BROKER_PRESET_CATALOG', () => {
   it('declares unique preset ids', () => {
     const ids = BROKER_PRESET_CATALOG.map(p => p.id)
     expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('contains exactly binance-cross-margin and mock-paper', () => {
+    const ids = BROKER_PRESET_CATALOG.map(p => p.id).sort()
+    expect(ids).toEqual(['binance-cross-margin', 'mock-paper'])
   })
 
   it('every preset id has a sample config in the test fixture', () => {
@@ -82,108 +71,40 @@ describe.each(BROKER_PRESET_CATALOG)('preset $id', (preset) => {
   })
 })
 
-// ==================== Mode → engine flag translation (the OKX-bug guard) ====================
+// ==================== Engine config translation ====================
 
 describe('preset → engine config translation', () => {
-  it('OKX mode=demo sets sandbox=true (avoids the demoTrading footgun)', () => {
-    const cfg = OKX_PRESET.toEngineConfig({ mode: 'demo', apiKey: 'k', secret: 's', password: 'p' })
-    expect(cfg.sandbox).toBe(true)
-    expect(cfg.demoTrading).toBeUndefined()  // never use the broken switch on OKX
-  })
-
-  it('OKX mode=live sets sandbox=false', () => {
-    const cfg = OKX_PRESET.toEngineConfig({ mode: 'live', apiKey: 'k', secret: 's', password: 'p' })
+  it('Binance Cross Margin sets exchange=binance, marginType=cross, sandbox=false', () => {
+    const cfg = BINANCE_CROSS_MARGIN_PRESET.toEngineConfig({ apiKey: 'k', secret: 's' })
+    expect(cfg.exchange).toBe('binance')
+    expect(cfg.marginType).toBe('cross')
     expect(cfg.sandbox).toBe(false)
+    expect(cfg.apiKey).toBe('k')
+    expect(cfg.secret).toBe('s')
   })
 
-  it('Bybit mode=testnet sets sandbox=true (separate testnet domain)', () => {
-    const cfg = BYBIT_PRESET.toEngineConfig({ mode: 'testnet', apiKey: 'k', secret: 's' })
-    expect(cfg.sandbox).toBe(true)
-    expect(cfg.demoTrading).toBe(false)
-  })
-
-  it('Bybit mode=demo sets demoTrading=true (production URL with simulated header)', () => {
-    const cfg = BYBIT_PRESET.toEngineConfig({ mode: 'demo', apiKey: 'k', secret: 's' })
-    expect(cfg.sandbox).toBe(false)
-    expect(cfg.demoTrading).toBe(true)
-  })
-
-  it('Hyperliquid mode=testnet sets sandbox=true', () => {
-    const cfg = HYPERLIQUID_PRESET.toEngineConfig({ mode: 'testnet', walletAddress: '0x', privateKey: 'pk' })
-    expect(cfg.sandbox).toBe(true)
-  })
-
-  it('Bitget mode=demo sets demoTrading=true', () => {
-    const cfg = BITGET_PRESET.toEngineConfig({ mode: 'demo', apiKey: 'k', secret: 's', password: 'p' })
-    expect(cfg.demoTrading).toBe(true)
-  })
-
-  it('Alpaca mode=paper sets paper=true', () => {
-    const cfg = ALPACA_PRESET.toEngineConfig({ mode: 'paper', apiKey: 'k', apiSecret: 's' })
-    expect(cfg.paper).toBe(true)
-  })
-
-  it('Alpaca mode=live sets paper=false', () => {
-    const cfg = ALPACA_PRESET.toEngineConfig({ mode: 'live', apiKey: 'k', apiSecret: 's' })
-    expect(cfg.paper).toBe(false)
-  })
-
-  it('Longbridge mode=paper sets paper=true', () => {
-    const cfg = LONGBRIDGE_PRESET.toEngineConfig({ mode: 'paper', appKey: 'k', appSecret: 's', accessToken: 't' })
-    expect(cfg.paper).toBe(true)
-  })
-
-  it('Longbridge mode=live sets paper=false', () => {
-    const cfg = LONGBRIDGE_PRESET.toEngineConfig({ mode: 'live', appKey: 'k', appSecret: 's', accessToken: 't' })
-    expect(cfg.paper).toBe(false)
-  })
-
-  it('IBKR passes host/port/clientId straight through', () => {
-    const cfg = IBKR_PRESET.toEngineConfig({ host: '10.0.0.5', port: 7496, clientId: 7 })
-    expect(cfg).toMatchObject({ host: '10.0.0.5', port: 7496, clientId: 7 })
-  })
-
-  it('CCXT Custom drops empty/undefined optional fields', () => {
-    const cfg = CCXT_CUSTOM_PRESET.toEngineConfig({ exchange: 'kucoin', apiKey: 'k', secret: '', uid: undefined })
-    expect(cfg).toEqual({ exchange: 'kucoin', apiKey: 'k' })
+  it('Mock Paper produces empty engine config', () => {
+    const cfg = MOCK_PAPER_PRESET.toEngineConfig({})
+    expect(cfg).toEqual({})
   })
 })
 
 // ==================== isPaper helper ====================
 
 describe('isPaperPreset', () => {
-  it('true for OKX demo, false for OKX live', () => {
-    expect(isPaperPreset('okx', { mode: 'demo' })).toBe(true)
-    expect(isPaperPreset('okx', { mode: 'live' })).toBe(false)
+  it('Binance Cross Margin is never paper (real money)', () => {
+    expect(isPaperPreset('binance-cross-margin', { apiKey: 'k', secret: 's' })).toBe(false)
   })
 
-  it('true for Bybit testnet AND demo, false for live', () => {
-    expect(isPaperPreset('bybit', { mode: 'testnet' })).toBe(true)
-    expect(isPaperPreset('bybit', { mode: 'demo' })).toBe(true)
-    expect(isPaperPreset('bybit', { mode: 'live' })).toBe(false)
+  it('mock-paper is always paper', () => {
+    expect(isPaperPreset('mock-paper', {})).toBe(true)
   })
 
-  it('true for Alpaca paper, false for Alpaca live', () => {
-    expect(isPaperPreset('alpaca', { mode: 'paper' })).toBe(true)
-    expect(isPaperPreset('alpaca', { mode: 'live' })).toBe(false)
-  })
-
-  it('true for Longbridge paper, false for Longbridge live', () => {
-    expect(isPaperPreset('longbridge', { mode: 'paper' })).toBe(true)
-    expect(isPaperPreset('longbridge', { mode: 'live' })).toBe(false)
-  })
-
-  it('IBKR uses port-based detection (7497 / 4002 → paper)', () => {
-    expect(isPaperPreset('ibkr-tws', { port: 7497 })).toBe(true)
-    expect(isPaperPreset('ibkr-tws', { port: 4002 })).toBe(true)
-    expect(isPaperPreset('ibkr-tws', { port: 7496 })).toBe(false)
-    expect(isPaperPreset('ibkr-tws', { port: 4001 })).toBe(false)
-  })
-
-  it('CCXT Custom checks sandbox/demoTrading flags', () => {
-    expect(isPaperPreset('ccxt-custom', { sandbox: true })).toBe(true)
-    expect(isPaperPreset('ccxt-custom', { demoTrading: true })).toBe(true)
-    expect(isPaperPreset('ccxt-custom', {})).toBe(false)
+  it('getBrokerPreset throws for deleted preset ids (okx, bybit, alpaca, ibkr-tws, etc.)', () => {
+    const deletedIds = ['okx', 'bybit', 'hyperliquid', 'bitget', 'alpaca', 'ibkr-tws', 'longbridge', 'leverup-monad', 'ccxt-custom']
+    for (const id of deletedIds) {
+      expect(() => getBrokerPreset(id)).toThrow(/Unknown broker preset/)
+    }
   })
 })
 
@@ -194,20 +115,10 @@ describe('BUILTIN_BROKER_PRESETS', () => {
     expect(BUILTIN_BROKER_PRESETS.map(p => p.id).sort()).toEqual(BROKER_PRESET_CATALOG.map(p => p.id).sort())
   })
 
-  it('Mode field becomes oneOf with title labels (so the wizard renders human-readable options)', () => {
-    const okx = BUILTIN_BROKER_PRESETS.find(p => p.id === 'okx')!
-    const props = (okx.schema as { properties: Record<string, { oneOf?: Array<{ const: string; title: string }> }> }).properties
-    expect(props.mode.oneOf).toEqual([
-      { const: 'live', title: 'Live' },
-      { const: 'demo', title: 'Demo Trading' },
-    ])
-  })
-
-  it('writeOnly markers applied to credential fields', () => {
-    const okx = BUILTIN_BROKER_PRESETS.find(p => p.id === 'okx')!
-    const props = (okx.schema as { properties: Record<string, { writeOnly?: boolean }> }).properties
+  it('writeOnly markers applied to Binance credential fields', () => {
+    const binance = BUILTIN_BROKER_PRESETS.find(p => p.id === 'binance-cross-margin')!
+    const props = (binance.schema as { properties: Record<string, { writeOnly?: boolean }> }).properties
     expect(props.apiKey.writeOnly).toBe(true)
     expect(props.secret.writeOnly).toBe(true)
-    expect(props.password.writeOnly).toBe(true)
   })
 })

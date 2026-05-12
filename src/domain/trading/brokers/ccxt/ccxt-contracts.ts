@@ -9,7 +9,7 @@
  * e.g. "bybit-ETH_USDT.USDT" for "ETH/USDT:USDT"
  */
 
-import { Contract, OrderState } from '@traderalice/ibkr'
+import { Contract, OrderState } from '@traderalice/ibkr-types'
 import '../../contract-ext.js'
 import type { CcxtMarket } from './ccxt-types.js'
 

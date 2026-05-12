@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import Decimal from 'decimal.js'
-import { Contract, Order, OrderState } from '@traderalice/ibkr'
+import { Contract, Order, OrderState } from '@traderalice/ibkr-types'
 import { TradingGit } from './TradingGit.js'
 import type { TradingGitConfig } from './interfaces.js'
 import type { Operation, GitState } from './types.js'

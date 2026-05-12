@@ -32,7 +32,7 @@ export type WireInteger =
   | { kind: 'unset' }
   | { kind: 'value'; value: number }
 
-import type { Order, Contract, ContractDetails, Execution, OrderState } from '@traderalice/ibkr'
+import type { Order, Contract, ContractDetails, Execution, OrderState } from '@traderalice/ibkr-types'
 
 /**
  * Per-class schemas — hand-transcribed from parity/decimal-inventory.md.

@@ -6,7 +6,7 @@
 
 import { tool } from 'ai'
 import { z } from 'zod'
-import { Contract } from '@traderalice/ibkr'
+import { Contract } from '@traderalice/ibkr-types'
 import type { UTAManager } from '../../uta-manager.js'
 import { isTsUta } from '../../uta-manager.js'
 import { CcxtBroker } from './CcxtBroker.js'

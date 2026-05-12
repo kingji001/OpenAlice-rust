@@ -16,7 +16,7 @@ import { TelegramConnector, splitMessage, MAX_MESSAGE_LENGTH } from './telegram-
 import type { UTAManager } from '../../domain/trading/index.js'
 import type { Operation } from '../../domain/trading/git/types.js'
 import { getOperationSymbol } from '../../domain/trading/git/types.js'
-import { UNSET_DECIMAL } from '@traderalice/ibkr'
+import { UNSET_DECIMAL } from '@traderalice/ibkr-types'
 
 /** Build a display label for a profile. */
 function profileLabel(name: string, profile: { model: string }): string {

@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js'
 import { describe, expect, it } from 'vitest'
-import { Contract, ContractDetails, Execution, Order, OrderState, UNSET_DECIMAL, UNSET_DOUBLE, UNSET_INTEGER } from '@traderalice/ibkr'
+import { Contract, ContractDetails, Execution, Order, OrderState, UNSET_DECIMAL, UNSET_DOUBLE, UNSET_INTEGER } from '@traderalice/ibkr-types'
 import { ibkrPartialOrderToWire } from '../wire-adapters.js'
 import {
   CONTRACT_DETAILS_SCHEMA,

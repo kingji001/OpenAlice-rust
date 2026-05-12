@@ -27,15 +27,10 @@ export type { BrokerPresetDef, BrokerEngine, ModeOption, SubtitleSegment } from 
 export { BUILTIN_BROKER_PRESETS } from './presets.js'
 export type { SerializedBrokerPreset } from './presets.js'
 
-// Alpaca
-export { AlpacaBroker } from './alpaca/index.js'
-export type { AlpacaBrokerConfig } from './alpaca/index.js'
-
 // CCXT
 export { CcxtBroker } from './ccxt/index.js'
 export { createCcxtProviderTools } from './ccxt/index.js'
 export type { CcxtBrokerConfig } from './ccxt/index.js'
 
-// IBKR
-export { IbkrBroker } from './ibkr/index.js'
-export type { IbkrBrokerConfig } from './ibkr/index.js'
+// Mock (test/paper infrastructure)
+export { MockBroker } from './mock/MockBroker.js'

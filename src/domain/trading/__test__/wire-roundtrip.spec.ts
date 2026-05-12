@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import Decimal from 'decimal.js'
 import { describe, expect, it } from 'vitest'
-import { Contract, ContractDetails, Execution, Order, OrderState } from '@traderalice/ibkr'
+import { Contract, ContractDetails, Execution, Order, OrderState } from '@traderalice/ibkr-types'
 import {
   ibkrContractDetailsToWire,
   ibkrContractToWire,

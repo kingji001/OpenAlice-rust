@@ -13,7 +13,7 @@
  * data-vendor identity (that's structurally a different namespace).
  */
 
-import type { ContractDescription } from '@traderalice/ibkr'
+import type { ContractDescription } from '@traderalice/ibkr-types'
 import type { UTAManager } from './uta-manager.js'
 import {
   normalizeBrokerSearchPattern,

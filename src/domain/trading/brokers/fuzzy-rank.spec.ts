@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Contract } from '@traderalice/ibkr'
+import { Contract } from '@traderalice/ibkr-types'
 import { fuzzyRankContracts, type FuzzyRankInput } from './fuzzy-rank.js'
 
 function entry(

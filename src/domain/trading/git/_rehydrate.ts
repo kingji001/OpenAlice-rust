@@ -9,7 +9,7 @@
  */
 
 import Decimal from 'decimal.js'
-import { Order } from '@traderalice/ibkr'
+import { Order } from '@traderalice/ibkr-types'
 import type { GitCommit, GitState, Operation } from './types.js'
 
 /** Rehydrate Decimal fields lost during JSON round-trip. */

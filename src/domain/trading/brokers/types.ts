@@ -7,7 +7,7 @@
  * are defined here, with field names aligned to IBKR conventions.
  */
 
-import type { Contract, ContractDescription, ContractDetails, Order, OrderState, Execution, OrderCancel } from '@traderalice/ibkr'
+import type { Contract, ContractDescription, ContractDetails, Order, OrderState, Execution, OrderCancel } from '@traderalice/ibkr-types'
 import type Decimal from 'decimal.js'
 import '../contract-ext.js'
 

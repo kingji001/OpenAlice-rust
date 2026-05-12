@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import Decimal from 'decimal.js'
-import { Order, OrderState, UNSET_DOUBLE, UNSET_DECIMAL } from '@traderalice/ibkr'
+import { Order, OrderState, UNSET_DOUBLE, UNSET_DECIMAL } from '@traderalice/ibkr-types'
 import { UnifiedTradingAccount } from './UnifiedTradingAccount.js'
 import type { UnifiedTradingAccountOptions } from './UnifiedTradingAccount.js'
 import { MockBroker, makeContract, makePosition, makeOpenOrder } from './brokers/mock/index.js'

@@ -11,7 +11,7 @@
  */
 
 import Decimal from 'decimal.js'
-import type { Contract, ContractDescription, ContractDetails } from '@traderalice/ibkr'
+import type { Contract, ContractDescription, ContractDetails } from '@traderalice/ibkr-types'
 import type { AccountCapabilities, BrokerHealth, BrokerHealthInfo } from './brokers/types.js'
 import { CcxtBroker } from './brokers/ccxt/CcxtBroker.js'
 import { createCcxtProviderTools } from './brokers/ccxt/ccxt-tools.js'
@@ -141,12 +141,8 @@ export class UTAManager {
   private _inferAccountType(cfg: UTAConfig): string {
     const presetId = cfg.presetId ?? ''
     if (presetId.startsWith('mock')) return 'mock'
-    if (presetId.startsWith('alpaca')) return 'alpaca'
-    if (presetId.startsWith('ibkr')) return 'ibkr'
-    // Any CCXT-backed preset
-    if (presetId.startsWith('bybit') || presetId.startsWith('okx') ||
-        presetId.startsWith('hyperliquid') || presetId.startsWith('bitget') ||
-        presetId.startsWith('ccxt')) return 'ccxt'
+    // Any CCXT-backed preset (binance-cross-margin, ccxt-custom, etc.)
+    if (presetId.startsWith('binance') || presetId.startsWith('ccxt')) return 'ccxt'
     return 'mock'
   }
 
