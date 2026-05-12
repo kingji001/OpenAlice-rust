@@ -1,0 +1,13 @@
+[
+  { "name": "primitive-string", "input": "hello", "expected": "\"hello\"" },
+  { "name": "primitive-number", "input": 42, "expected": "42" },
+  { "name": "primitive-null", "input": null, "expected": "null" },
+  { "name": "primitive-bool", "input": true, "expected": "true" },
+  { "name": "empty-object", "input": {}, "expected": "{}" },
+  { "name": "empty-array", "input": [], "expected": "[]" },
+  { "name": "object-keys-sorted", "input": { "b": 1, "a": 2, "c": 3 }, "expected": "{\"a\":2,\"b\":1,\"c\":3}" },
+  { "name": "nested-object-sorted", "input": { "outer": { "z": 1, "a": 2 }, "alpha": "x" }, "expected": "{\"alpha\":\"x\",\"outer\":{\"a\":2,\"z\":1}}" },
+  { "name": "array-preserves-order", "input": [3, 1, 2], "expected": "[3,1,2]" },
+  { "name": "array-of-objects", "input": [{ "b": 1, "a": 2 }, { "z": 3 }], "expected": "[{\"a\":2,\"b\":1},{\"z\":3}]" },
+  { "name": "deeply-nested", "input": { "a": { "b": { "c": [1, { "y": 2, "x": 1 }] } } }, "expected": "{\"a\":{\"b\":{\"c\":[1,{\"x\":1,\"y\":2}]}}}" }
+]

@@ -1,0 +1,21 @@
+[
+  { "input": "0",                          "expected": "0" },
+  { "input": "-0",                         "expected": "0" },
+  { "input": "0.0",                        "expected": "0" },
+  { "input": "0.0000",                     "expected": "0" },
+  { "input": "1",                          "expected": "1" },
+  { "input": "-1",                         "expected": "-1" },
+  { "input": "1.0",                        "expected": "1" },
+  { "input": "1.5",                        "expected": "1.5" },
+  { "input": "1.50",                       "expected": "1.5" },
+  { "input": "1.500",                      "expected": "1.5" },
+  { "input": "150.50",                     "expected": "150.5" },
+  { "input": "150.5000000",                "expected": "150.5" },
+  { "input": "100",                        "expected": "100" },
+  { "input": "-100",                       "expected": "-100" },
+  { "input": "-1.5",                       "expected": "-1.5" },
+  { "input": "0.00000001",                 "expected": "0.00000001" },
+  { "input": "0.000000010",                "expected": "0.00000001" },
+  { "input": "12345.6789",                 "expected": "12345.6789" },
+  { "input": "100000000000000000000000",   "expected": "100000000000000000000000" }
+]
