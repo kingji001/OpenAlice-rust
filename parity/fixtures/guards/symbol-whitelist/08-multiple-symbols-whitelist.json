@@ -1,0 +1,48 @@
+{
+  "description": "symbol-whitelist: symbols [AAPL, MSFT, NVDA] — placeOrder for NVDA is allowed",
+  "guards": [
+    {
+      "type": "symbol-whitelist",
+      "options": {
+        "symbols": [
+          "AAPL",
+          "MSFT",
+          "NVDA"
+        ]
+      }
+    }
+  ],
+  "broker_state": {
+    "positions": [],
+    "account": {
+      "baseCurrency": "USD",
+      "netLiquidation": "100000",
+      "totalCashValue": "100000",
+      "unrealizedPnL": "0",
+      "realizedPnL": "0"
+    }
+  },
+  "ops": [
+    {
+      "step": "op",
+      "op": {
+        "action": "placeOrder",
+        "contract": {
+          "symbol": "NVDA",
+          "aliceId": "mock|NVDA"
+        },
+        "order": {
+          "action": "BUY",
+          "cashQty": "170141183460469231731687303715884105727",
+          "totalQuantity": "5",
+          "orderType": "MKT"
+        }
+      }
+    }
+  ],
+  "expected": [
+    {
+      "success": true
+    }
+  ]
+}

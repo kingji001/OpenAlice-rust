@@ -1,0 +1,145 @@
+{
+  "description": "symbol-whitelist: 100-symbol whitelist — placeOrder for SYM050 is allowed",
+  "guards": [
+    {
+      "type": "symbol-whitelist",
+      "options": {
+        "symbols": [
+          "SYM000",
+          "SYM001",
+          "SYM002",
+          "SYM003",
+          "SYM004",
+          "SYM005",
+          "SYM006",
+          "SYM007",
+          "SYM008",
+          "SYM009",
+          "SYM010",
+          "SYM011",
+          "SYM012",
+          "SYM013",
+          "SYM014",
+          "SYM015",
+          "SYM016",
+          "SYM017",
+          "SYM018",
+          "SYM019",
+          "SYM020",
+          "SYM021",
+          "SYM022",
+          "SYM023",
+          "SYM024",
+          "SYM025",
+          "SYM026",
+          "SYM027",
+          "SYM028",
+          "SYM029",
+          "SYM030",
+          "SYM031",
+          "SYM032",
+          "SYM033",
+          "SYM034",
+          "SYM035",
+          "SYM036",
+          "SYM037",
+          "SYM038",
+          "SYM039",
+          "SYM040",
+          "SYM041",
+          "SYM042",
+          "SYM043",
+          "SYM044",
+          "SYM045",
+          "SYM046",
+          "SYM047",
+          "SYM048",
+          "SYM049",
+          "SYM050",
+          "SYM051",
+          "SYM052",
+          "SYM053",
+          "SYM054",
+          "SYM055",
+          "SYM056",
+          "SYM057",
+          "SYM058",
+          "SYM059",
+          "SYM060",
+          "SYM061",
+          "SYM062",
+          "SYM063",
+          "SYM064",
+          "SYM065",
+          "SYM066",
+          "SYM067",
+          "SYM068",
+          "SYM069",
+          "SYM070",
+          "SYM071",
+          "SYM072",
+          "SYM073",
+          "SYM074",
+          "SYM075",
+          "SYM076",
+          "SYM077",
+          "SYM078",
+          "SYM079",
+          "SYM080",
+          "SYM081",
+          "SYM082",
+          "SYM083",
+          "SYM084",
+          "SYM085",
+          "SYM086",
+          "SYM087",
+          "SYM088",
+          "SYM089",
+          "SYM090",
+          "SYM091",
+          "SYM092",
+          "SYM093",
+          "SYM094",
+          "SYM095",
+          "SYM096",
+          "SYM097",
+          "SYM098",
+          "SYM099"
+        ]
+      }
+    }
+  ],
+  "broker_state": {
+    "positions": [],
+    "account": {
+      "baseCurrency": "USD",
+      "netLiquidation": "100000",
+      "totalCashValue": "100000",
+      "unrealizedPnL": "0",
+      "realizedPnL": "0"
+    }
+  },
+  "ops": [
+    {
+      "step": "op",
+      "op": {
+        "action": "placeOrder",
+        "contract": {
+          "symbol": "SYM050",
+          "aliceId": "mock|SYM050"
+        },
+        "order": {
+          "action": "BUY",
+          "cashQty": "170141183460469231731687303715884105727",
+          "totalQuantity": "1",
+          "orderType": "MKT"
+        }
+      }
+    }
+  ],
+  "expected": [
+    {
+      "success": true
+    }
+  ]
+}

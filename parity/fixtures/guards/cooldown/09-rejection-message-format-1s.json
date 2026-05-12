@@ -1,0 +1,64 @@
+{
+  "description": "cooldown: rejection message shows 1s remaining for 1000ms interval",
+  "guards": [
+    {
+      "type": "cooldown",
+      "options": {
+        "minIntervalMs": 1000
+      }
+    }
+  ],
+  "broker_state": {
+    "positions": [],
+    "account": {
+      "baseCurrency": "USD",
+      "netLiquidation": "100000",
+      "totalCashValue": "100000",
+      "unrealizedPnL": "0",
+      "realizedPnL": "0"
+    }
+  },
+  "ops": [
+    {
+      "step": "op",
+      "op": {
+        "action": "placeOrder",
+        "contract": {
+          "symbol": "AAPL",
+          "aliceId": "mock|AAPL"
+        },
+        "order": {
+          "action": "BUY",
+          "cashQty": "170141183460469231731687303715884105727",
+          "totalQuantity": "10",
+          "orderType": "MKT"
+        }
+      }
+    },
+    {
+      "step": "op",
+      "op": {
+        "action": "placeOrder",
+        "contract": {
+          "symbol": "AAPL",
+          "aliceId": "mock|AAPL"
+        },
+        "order": {
+          "action": "BUY",
+          "cashQty": "170141183460469231731687303715884105727",
+          "totalQuantity": "10",
+          "orderType": "MKT"
+        }
+      }
+    }
+  ],
+  "expected": [
+    {
+      "success": true
+    },
+    {
+      "success": false,
+      "errorContains": "Cooldown active for AAPL: 1s remaining"
+    }
+  ]
+}

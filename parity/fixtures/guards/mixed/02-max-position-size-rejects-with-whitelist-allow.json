@@ -1,0 +1,53 @@
+{
+  "description": "mixed: AAPL passes whitelist but cashQty 30000 (30%) exceeds max-position-size limit",
+  "guards": [
+    {
+      "type": "symbol-whitelist",
+      "options": {
+        "symbols": [
+          "AAPL"
+        ]
+      }
+    },
+    {
+      "type": "max-position-size",
+      "options": {
+        "maxPercentOfEquity": 25
+      }
+    }
+  ],
+  "broker_state": {
+    "positions": [],
+    "account": {
+      "baseCurrency": "USD",
+      "netLiquidation": "100000",
+      "totalCashValue": "100000",
+      "unrealizedPnL": "0",
+      "realizedPnL": "0"
+    }
+  },
+  "ops": [
+    {
+      "step": "op",
+      "op": {
+        "action": "placeOrder",
+        "contract": {
+          "symbol": "AAPL",
+          "aliceId": "mock|AAPL"
+        },
+        "order": {
+          "action": "BUY",
+          "cashQty": "30000",
+          "totalQuantity": "170141183460469231731687303715884105727",
+          "orderType": "MKT"
+        }
+      }
+    }
+  ],
+  "expected": [
+    {
+      "success": false,
+      "errorContains": "[guard:max-position-size] Position for AAPL would be 30.0% of equity"
+    }
+  ]
+}

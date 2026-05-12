@@ -1,0 +1,45 @@
+{
+  "description": "symbol-whitelist: contract.symbol missing — falls back to aliceId as the symbol key",
+  "guards": [
+    {
+      "type": "symbol-whitelist",
+      "options": {
+        "symbols": [
+          "mock|TSLA"
+        ]
+      }
+    }
+  ],
+  "broker_state": {
+    "positions": [],
+    "account": {
+      "baseCurrency": "USD",
+      "netLiquidation": "100000",
+      "totalCashValue": "100000",
+      "unrealizedPnL": "0",
+      "realizedPnL": "0"
+    }
+  },
+  "ops": [
+    {
+      "step": "op",
+      "op": {
+        "action": "placeOrder",
+        "contract": {
+          "aliceId": "mock|TSLA"
+        },
+        "order": {
+          "action": "BUY",
+          "cashQty": "170141183460469231731687303715884105727",
+          "totalQuantity": "10",
+          "orderType": "MKT"
+        }
+      }
+    }
+  ],
+  "expected": [
+    {
+      "success": true
+    }
+  ]
+}

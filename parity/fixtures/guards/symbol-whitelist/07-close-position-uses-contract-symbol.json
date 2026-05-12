@@ -1,0 +1,40 @@
+{
+  "description": "symbol-whitelist: closePosition uses contract.symbol — AAPL in whitelist is allowed",
+  "guards": [
+    {
+      "type": "symbol-whitelist",
+      "options": {
+        "symbols": [
+          "AAPL"
+        ]
+      }
+    }
+  ],
+  "broker_state": {
+    "positions": [],
+    "account": {
+      "baseCurrency": "USD",
+      "netLiquidation": "100000",
+      "totalCashValue": "100000",
+      "unrealizedPnL": "0",
+      "realizedPnL": "0"
+    }
+  },
+  "ops": [
+    {
+      "step": "op",
+      "op": {
+        "action": "closePosition",
+        "contract": {
+          "symbol": "AAPL",
+          "aliceId": "mock|AAPL"
+        }
+      }
+    }
+  ],
+  "expected": [
+    {
+      "success": true
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "description": "max-position-size: existing position + totalQty*marketPrice exceeds 25% limit",
+  "guards": [
+    {
+      "type": "max-position-size",
+      "options": {
+        "maxPercentOfEquity": 25
+      }
+    }
+  ],
+  "broker_state": {
+    "positions": [
+      {
+        "contract": {
+          "symbol": "AAPL",
+          "aliceId": "mock|AAPL"
+        },
+        "currency": "USD",
+        "side": "long",
+        "quantity": "100",
+        "avgCost": "100",
+        "marketPrice": "100",
+        "marketValue": "10000",
+        "unrealizedPnL": "0",
+        "realizedPnL": "0"
+      }
+    ],
+    "account": {
+      "baseCurrency": "USD",
+      "netLiquidation": "100000",
+      "totalCashValue": "100000",
+      "unrealizedPnL": "0",
+      "realizedPnL": "0"
+    }
+  },
+  "ops": [
+    {
+      "step": "op",
+      "op": {
+        "action": "placeOrder",
+        "contract": {
+          "symbol": "AAPL",
+          "aliceId": "mock|AAPL"
+        },
+        "order": {
+          "action": "BUY",
+          "cashQty": "170141183460469231731687303715884105727",
+          "totalQuantity": "200",
+          "orderType": "MKT"
+        }
+      }
+    }
+  ],
+  "expected": [
+    {
+      "success": false,
+      "errorContains": "Position for AAPL would be 30.0% of equity (limit: 25%)"
+    }
+  ]
+}

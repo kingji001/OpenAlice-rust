@@ -1,0 +1,37 @@
+{
+  "description": "symbol-whitelist: cancelOrder symbol resolves to unknown — bypasses guard",
+  "guards": [
+    {
+      "type": "symbol-whitelist",
+      "options": {
+        "symbols": [
+          "AAPL"
+        ]
+      }
+    }
+  ],
+  "broker_state": {
+    "positions": [],
+    "account": {
+      "baseCurrency": "USD",
+      "netLiquidation": "100000",
+      "totalCashValue": "100000",
+      "unrealizedPnL": "0",
+      "realizedPnL": "0"
+    }
+  },
+  "ops": [
+    {
+      "step": "op",
+      "op": {
+        "action": "cancelOrder",
+        "orderId": "o1"
+      }
+    }
+  ],
+  "expected": [
+    {
+      "success": true
+    }
+  ]
+}

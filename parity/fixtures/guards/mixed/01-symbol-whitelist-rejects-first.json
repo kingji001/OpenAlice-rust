@@ -1,0 +1,53 @@
+{
+  "description": "mixed: symbol-whitelist guard first — GME rejected before max-position check",
+  "guards": [
+    {
+      "type": "symbol-whitelist",
+      "options": {
+        "symbols": [
+          "AAPL"
+        ]
+      }
+    },
+    {
+      "type": "max-position-size",
+      "options": {
+        "maxPercentOfEquity": 25
+      }
+    }
+  ],
+  "broker_state": {
+    "positions": [],
+    "account": {
+      "baseCurrency": "USD",
+      "netLiquidation": "100000",
+      "totalCashValue": "100000",
+      "unrealizedPnL": "0",
+      "realizedPnL": "0"
+    }
+  },
+  "ops": [
+    {
+      "step": "op",
+      "op": {
+        "action": "placeOrder",
+        "contract": {
+          "symbol": "GME",
+          "aliceId": "mock|GME"
+        },
+        "order": {
+          "action": "BUY",
+          "cashQty": "30000",
+          "totalQuantity": "170141183460469231731687303715884105727",
+          "orderType": "MKT"
+        }
+      }
+    }
+  ],
+  "expected": [
+    {
+      "success": false,
+      "errorContains": "[guard:symbol-whitelist] Symbol GME is not in the allowed list"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "description": "cooldown: modifyOrder and cancelOrder bypass the guard",
+  "guards": [
+    {
+      "type": "cooldown",
+      "options": {
+        "minIntervalMs": 60000
+      }
+    }
+  ],
+  "broker_state": {
+    "positions": [],
+    "account": {
+      "baseCurrency": "USD",
+      "netLiquidation": "100000",
+      "totalCashValue": "100000",
+      "unrealizedPnL": "0",
+      "realizedPnL": "0"
+    }
+  },
+  "ops": [
+    {
+      "step": "op",
+      "op": {
+        "action": "modifyOrder",
+        "orderId": "o1",
+        "changes": {}
+      }
+    },
+    {
+      "step": "op",
+      "op": {
+        "action": "cancelOrder",
+        "orderId": "o2"
+      }
+    },
+    {
+      "step": "op",
+      "op": {
+        "action": "syncOrders"
+      }
+    }
+  ],
+  "expected": [
+    {
+      "success": true
+    },
+    {
+      "success": true
+    },
+    {
+      "success": true
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "description": "max-position-size: cashQty 25000.0001 (25.000001%) is just over limit \u2014 rejected",
+  "guards": [
+    {
+      "type": "max-position-size",
+      "options": {
+        "maxPercentOfEquity": 25
+      }
+    }
+  ],
+  "broker_state": {
+    "positions": [],
+    "account": {
+      "baseCurrency": "USD",
+      "netLiquidation": "100000",
+      "totalCashValue": "100000",
+      "unrealizedPnL": "0",
+      "realizedPnL": "0"
+    }
+  },
+  "ops": [
+    {
+      "step": "op",
+      "op": {
+        "action": "placeOrder",
+        "contract": {
+          "symbol": "AAPL",
+          "aliceId": "mock|AAPL"
+        },
+        "order": {
+          "action": "BUY",
+          "cashQty": "25000.0001",
+          "totalQuantity": "170141183460469231731687303715884105727",
+          "orderType": "MKT"
+        }
+      }
+    }
+  ],
+  "expected": [
+    {
+      "success": false,
+      "errorContains": "Position for AAPL would be 25.0% of equity (limit: 25%)"
+    }
+  ]
+}
