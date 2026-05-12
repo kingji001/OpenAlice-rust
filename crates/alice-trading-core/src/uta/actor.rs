@@ -226,25 +226,40 @@ impl UtaActor {
             .map(|_| self.state.broker.allocate_client_order_id())
             .collect();
         for (op, cli_id) in ops_with_cli_ids.iter_mut().zip(client_order_ids.iter()) {
-            if let Operation::PlaceOrder { order, .. } = op {
-                // Issue 3 fix: warn when PlaceOrder.order is not a JSON object so that a
-                // journal/broker mismatch is surfaced rather than silently no-oped.
-                match order.as_object_mut() {
-                    Some(obj) => {
-                        obj.insert(
-                            "clientOrderId".to_string(),
-                            serde_json::Value::String(cli_id.clone()),
-                        );
-                    }
-                    None => {
-                        tracing::warn!(
-                            target: "uta",
-                            account = %self.state.account_id,
-                            cli_id = %cli_id,
-                            "PlaceOrder.order is not a JSON object; clientOrderId injection skipped"
-                        );
+            match op {
+                Operation::PlaceOrder { order, .. } => {
+                    // Issue 3 fix: warn when PlaceOrder.order is not a JSON object so that a
+                    // journal/broker mismatch is surfaced rather than silently no-oped.
+                    match order.as_object_mut() {
+                        Some(obj) => {
+                            obj.insert(
+                                "clientOrderId".to_string(),
+                                serde_json::Value::String(cli_id.clone()),
+                            );
+                        }
+                        None => {
+                            tracing::warn!(
+                                target: "uta",
+                                account = %self.state.account_id,
+                                cli_id = %cli_id,
+                                "PlaceOrder.order is not a JSON object; clientOrderId injection skipped"
+                            );
+                        }
                     }
                 }
+                Operation::Borrow {
+                    client_order_id, ..
+                }
+                | Operation::Repay {
+                    client_order_id, ..
+                }
+                | Operation::TransferFunding {
+                    client_order_id, ..
+                } => {
+                    *client_order_id = Some(cli_id.clone());
+                }
+                // ModifyOrder, CancelOrder, ClosePosition, SyncOrders: no cli-id injection needed.
+                _ => {}
             }
         }
 
@@ -454,6 +469,16 @@ async fn broker_dispatch(broker: &Arc<dyn Broker>, op: &Operation) -> Result<Val
             .map_err(|e| e.message)?,
         Operation::SyncOrders => {
             return Err("syncOrders dispatched via handle_sync".to_string());
+        }
+        // Margin operations: not yet wired to a concrete broker method (Phase 4e scaffolding).
+        // Returns an empty JSON object as a placeholder; the real Binance margin broker will
+        // override this in P8 when the BinanceMarginBroker implements borrow/repay/transfer.
+        Operation::Borrow { .. } | Operation::Repay { .. } | Operation::TransferFunding { .. } => {
+            tracing::warn!(
+                target: "uta",
+                "margin operation dispatched to stub; real BinanceMarginBroker dispatch wired in P8"
+            );
+            return Ok(serde_json::Value::Object(serde_json::Map::new()));
         }
     };
     serde_json::to_value(result).map_err(|e| e.to_string())

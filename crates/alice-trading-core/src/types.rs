@@ -36,6 +36,31 @@ pub enum Operation {
         order_cancel: Option<Value>,
     },
     SyncOrders,
+    /// Cross-margin: borrow an asset from the exchange.
+    Borrow {
+        asset: String,
+        amount: String,
+        /// Allocated by `Broker::allocate_client_order_id()` at record_intent.
+        #[serde(rename = "clientOrderId", skip_serializing_if = "Option::is_none")]
+        client_order_id: Option<String>,
+    },
+    /// Cross-margin: repay a borrowed asset.
+    Repay {
+        asset: String,
+        amount: String,
+        #[serde(rename = "clientOrderId", skip_serializing_if = "Option::is_none")]
+        client_order_id: Option<String>,
+    },
+    /// Cross-margin: transfer funds between spot and cross-margin wallets.
+    TransferFunding {
+        /// `"SPOT_TO_CROSS_MARGIN"` or `"CROSS_MARGIN_TO_SPOT"`.
+        #[serde(rename = "transferType")]
+        transfer_type: String,
+        asset: String,
+        amount: String,
+        #[serde(rename = "clientOrderId", skip_serializing_if = "Option::is_none")]
+        client_order_id: Option<String>,
+    },
 }
 
 impl Operation {
@@ -47,6 +72,9 @@ impl Operation {
             Operation::ClosePosition { .. } => "closePosition",
             Operation::CancelOrder { .. } => "cancelOrder",
             Operation::SyncOrders => "syncOrders",
+            Operation::Borrow { .. } => "borrow",
+            Operation::Repay { .. } => "repay",
+            Operation::TransferFunding { .. } => "transferFunding",
         }
     }
 }
