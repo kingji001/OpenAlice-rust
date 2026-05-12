@@ -4,5 +4,13 @@
 //! Phase 4d's UtaActor will consume `Box<dyn Broker>`.
 
 pub mod error;
+pub mod traits;
+pub mod types;
 
 pub use error::{classify_message, BrokerError, BrokerErrorCode};
+pub use traits::Broker;
+pub use types::{
+    AccountCapabilities, AccountInfo, BrokerCapabilities, BrokerHealth, BrokerHealthInfo,
+    CloseMode, MarketClock, OpenOrder, OrderTypeFlags, PlaceOrderResult, Position, PositionSide,
+    Quote, SigningScheme,
+};
