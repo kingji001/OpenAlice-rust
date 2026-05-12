@@ -27,9 +27,14 @@ import {
   type MarginAsset,
   type MarginOperationResult,
   type FundingTransfer,
+  type LeverageSetting,
+  type PositionMode,
+  type MarginMode,
+  type FundingRate,
+  type MarkPriceSnapshot,
 } from '../types.js'
 import '../../contract-ext.js'
-import { CCXT_CREDENTIAL_FIELDS, type CcxtBrokerConfig, type CcxtMarket, type FundingRate, type OrderBook, type OrderBookLevel } from './ccxt-types.js'
+import { CCXT_CREDENTIAL_FIELDS, type CcxtBrokerConfig, type CcxtMarket, type CcxtFundingRate, type OrderBook, type OrderBookLevel } from './ccxt-types.js'
 import { MAX_INIT_RETRIES, INIT_RETRY_BASE_MS } from './ccxt-types.js'
 import {
   ccxtTypeToSecType,
@@ -95,6 +100,7 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     sandbox: z.boolean().default(false),
     demoTrading: z.boolean().default(false),
     options: z.record(z.string(), z.unknown()).optional(),
+    tradingMode: z.enum(['spot', 'cross-margin', 'usdm-futures', 'coinm-futures']).optional(),
     // All 10 CCXT standard credential fields, all optional.
     // Each exchange requires its own subset (read via Exchange.requiredCredentials).
     apiKey: z.string().optional(),
@@ -127,6 +133,7 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       sandbox: bc.sandbox,
       demoTrading: bc.demoTrading,
       options: bc.options,
+      tradingMode: bc.tradingMode,
       apiKey: bc.apiKey,
       // Accept both `secret` (CCXT-native) and legacy `apiSecret`
       secret: bc.secret ?? bc.apiSecret,
@@ -151,8 +158,12 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
   private exchangeName: string
   private initialized = false
   private overrides: CcxtExchangeOverrides
-  /** True when marginType === 'cross'. Used to gate margin-only methods. */
+  /** The resolved trading mode. Defaults to 'spot'. */
+  private tradingMode: 'spot' | 'cross-margin' | 'usdm-futures' | 'coinm-futures' = 'spot'
+  /** True when tradingMode === 'cross-margin'. Used to gate margin-only methods. */
   private isMargin = false
+  /** True when tradingMode is 'usdm-futures' or 'coinm-futures'. Used to gate futures-only methods. */
+  private isFutures = false
   // orderId → ccxtSymbol cache (CCXT needs symbol to cancel)
   private orderSymbolCache = new Map<string, string>()
 
@@ -176,15 +187,21 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     const cfgRecord = config as unknown as Record<string, unknown>
     const credentials: Record<string, unknown> = {}
 
-    // When marginType is 'cross', tell CCXT to use margin endpoints by default.
-    // For Binance, defaultType: 'margin' routes all requests through the margin wallet.
-    if (config.marginType === 'cross') {
-      this.isMargin = true
-      const existingOptions = config.options ?? {}
-      credentials.options = { ...existingOptions, defaultType: 'margin' }
-    } else if (config.options !== undefined) {
-      credentials.options = config.options
-    }
+    // Resolve trading mode and set CCXT defaultType accordingly.
+    const defaultTypeMap = {
+      'spot': 'spot',
+      'cross-margin': 'margin',
+      'usdm-futures': 'future',
+      'coinm-futures': 'delivery',
+    } as const
+
+    this.tradingMode = config.tradingMode ?? 'spot'
+    this.isMargin = this.tradingMode === 'cross-margin'
+    this.isFutures = this.tradingMode === 'usdm-futures' || this.tradingMode === 'coinm-futures'
+
+    const defaultType = defaultTypeMap[this.tradingMode]
+    const existingOptions = config.options ?? {}
+    credentials.options = { ...existingOptions, defaultType }
 
     for (const field of CCXT_CREDENTIAL_FIELDS) {
       const v = cfgRecord[field]
@@ -443,6 +460,27 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
         // Signal to CCXT that this is a margin order when broker is in margin mode.
         if (this.isMargin) {
           params.type = 'margin'
+        }
+      }
+
+      // Map futures order parameters to CCXT params.
+      // Mutually exclusive with marginParams in practice; if both are set it's a developer
+      // error — log a warning and let futuresParams win on conflicting fields.
+      if (order.futuresParams && this.isFutures) {
+        if (order.marginParams) {
+          console.warn(`CcxtBroker[${this.id}]: placeOrder — both marginParams and futuresParams are set; futuresParams takes precedence on conflicting fields`)
+        }
+        if (order.futuresParams.positionSide) {
+          params.positionSide = order.futuresParams.positionSide
+        }
+        if (order.futuresParams.reduceOnly !== undefined) {
+          params.reduceOnly = order.futuresParams.reduceOnly
+        }
+        if (order.futuresParams.closePosition !== undefined) {
+          params.closePosition = order.futuresParams.closePosition
+        }
+        if (order.futuresParams.timeInForce) {
+          params.timeInForce = order.futuresParams.timeInForce
         }
       }
 
@@ -899,7 +937,7 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
 
   // ---- Provider-specific methods ----
 
-  async fetchFundingRateByContract(contract: Contract): Promise<FundingRate> {
+  async fetchFundingRateByContract(contract: Contract): Promise<CcxtFundingRate> {
     this.ensureInit()
 
     const ccxtSymbol = contractToCcxt(contract, this.markets, this.exchangeName)
@@ -946,7 +984,7 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     }
   }
 
-  // ---- Margin operations (only available when marginType === 'cross') ----
+  // ---- Margin operations (only available when tradingMode === 'cross-margin') ----
 
   /**
    * Asserts that this broker is configured for margin trading.
@@ -954,7 +992,19 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
    */
   private _requireMargin(): void {
     if (!this.isMargin) {
-      throw new BrokerError('CONFIG', `CcxtBroker[${this.id}]: margin operations require marginType='cross'`)
+      throw new BrokerError('CONFIG', `CcxtBroker[${this.id}]: margin operations require tradingMode='cross-margin'`)
+    }
+  }
+
+  // ---- Futures operations (only available when tradingMode === 'usdm-futures' or 'coinm-futures') ----
+
+  /**
+   * Asserts that this broker is configured for futures trading.
+   * Throws BrokerError('CONFIG', ...) if not.
+   */
+  private _requireFutures(): void {
+    if (!this.isFutures) {
+      throw new BrokerError('CONFIG', `CcxtBroker[${this.id}]: futures operations require tradingMode='usdm-futures' or 'coinm-futures'`)
     }
   }
 
@@ -1057,6 +1107,114 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       }
     } catch (err) {
       throw BrokerError.from(err)
+    }
+  }
+
+  // ---- Futures methods ----
+
+  /**
+   * Set per-symbol leverage. Idempotent.
+   * CCXT: setLeverage(leverage, symbol)
+   */
+  async setLeverage(symbol: string, leverage: number): Promise<LeverageSetting> {
+    this._requireFutures()
+    const result = await this.exchange.setLeverage(leverage, symbol) as { leverage?: number; maxNotionalValue?: string | number }
+    return {
+      symbol,
+      leverage: Number(result?.leverage ?? leverage),
+      maxNotionalValue: result?.maxNotionalValue !== undefined ? String(result.maxNotionalValue) : undefined,
+    }
+  }
+
+  /**
+   * Read the current leverage setting for a symbol.
+   * CCXT: fetchPositions([symbol]) — each position carries a leverage field.
+   */
+  async getLeverage(symbol: string): Promise<LeverageSetting> {
+    this._requireFutures()
+    const positions = await this.exchange.fetchPositions([symbol])
+    const pos = positions[0]
+    if (!pos) {
+      throw new Error(`No leverage data for ${symbol}`)
+    }
+    return {
+      symbol,
+      leverage: Number((pos as unknown as Record<string, unknown>).leverage ?? 1),
+      maxNotionalValue: (pos as unknown as Record<string, unknown>).info !== null
+        && typeof (pos as unknown as Record<string, unknown>).info === 'object'
+        && (((pos as unknown as Record<string, unknown>).info as Record<string, unknown>).maxNotionalValue !== undefined)
+        ? String(((pos as unknown as Record<string, unknown>).info as Record<string, unknown>).maxNotionalValue)
+        : undefined,
+    }
+  }
+
+  /**
+   * Set account-wide position mode (one-way vs hedge).
+   * CCXT: setPositionMode(hedged: boolean)
+   */
+  async setPositionMode(mode: PositionMode): Promise<void> {
+    this._requireFutures()
+    await this.exchange.setPositionMode(mode === 'HEDGE')
+  }
+
+  /**
+   * Read current account-wide position mode.
+   * For USDM: GET /fapi/v1/positionSide/dual → { dualSidePosition: boolean }
+   * For COINM: GET /dapi/v1/positionSide/dual → { dualSidePosition: boolean }
+   */
+  async getPositionMode(): Promise<PositionMode> {
+    this._requireFutures()
+    const ex = this.exchange as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>
+    const methodName = this.tradingMode === 'usdm-futures'
+      ? 'fapiPrivateGetPositionSideDual'
+      : 'dapiPrivateGetPositionSideDual'
+    const result = await ex[methodName]({}) as { dualSidePosition?: boolean }
+    return result?.dualSidePosition ? 'HEDGE' : 'ONE_WAY'
+  }
+
+  /**
+   * Set per-symbol margin mode (CROSS or ISOLATED).
+   * CCXT: setMarginMode('cross' | 'isolated', symbol)
+   */
+  async setMarginMode(symbol: string, mode: MarginMode): Promise<void> {
+    this._requireFutures()
+    await this.exchange.setMarginMode(mode === 'CROSS' ? 'cross' : 'isolated', symbol)
+  }
+
+  /**
+   * Read the current funding rate for a perpetual symbol.
+   * CCXT: fetchFundingRate(symbol)
+   */
+  async getFundingRate(symbol: string): Promise<FundingRate> {
+    this._requireFutures()
+    const rate = await this.exchange.fetchFundingRate(symbol) as unknown as Record<string, unknown>
+    return {
+      symbol,
+      rate: String(rate.fundingRate ?? '0'),
+      annualizedRate: rate.estimatedAnnualizedRate ? String(rate.estimatedAnnualizedRate) : undefined,
+      nextFundingTime: new Date(Number(rate.fundingTimestamp ?? Date.now())).toISOString(),
+      markPrice: String(rate.markPrice ?? '0'),
+      indexPrice: rate.indexPrice ? String(rate.indexPrice) : undefined,
+    }
+  }
+
+  /**
+   * Read mark price for a symbol (futures-specific).
+   * For USDM: GET /fapi/v1/premiumIndex → { markPrice, indexPrice, lastFundingRate }
+   * For COINM: GET /dapi/v1/premiumIndex
+   */
+  async getMarkPrice(symbol: string): Promise<MarkPriceSnapshot> {
+    this._requireFutures()
+    const ex = this.exchange as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>
+    const methodName = this.tradingMode === 'usdm-futures'
+      ? 'fapiPublicGetPremiumIndex'
+      : 'dapiPublicGetPremiumIndex'
+    const result = await ex[methodName]({ symbol }) as { markPrice?: string; indexPrice?: string; estimatedSettlePrice?: string; lastFundingRate?: string }
+    return {
+      symbol,
+      markPrice: String(result.markPrice ?? '0'),
+      indexPrice: result.indexPrice ? String(result.indexPrice) : undefined,
+      estimatedFundingRate: result.lastFundingRate ? String(result.lastFundingRate) : undefined,
     }
   }
 }

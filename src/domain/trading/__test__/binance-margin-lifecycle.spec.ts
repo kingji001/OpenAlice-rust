@@ -41,6 +41,14 @@ vi.mock('ccxt', () => {
     this.sapiPostMarginLoan = vi.fn()
     this.sapiPostMarginRepay = vi.fn()
     this.sapiPostMarginTransfer = vi.fn()
+    // Futures endpoints (unused in margin tests, but needed so the mock is complete)
+    this.setLeverage = vi.fn()
+    this.setPositionMode = vi.fn()
+    this.setMarginMode = vi.fn()
+    this.fapiPrivateGetPositionSideDual = vi.fn()
+    this.dapiPrivateGetPositionSideDual = vi.fn()
+    this.fapiPublicGetPremiumIndex = vi.fn()
+    this.dapiPublicGetPremiumIndex = vi.fn()
   })
 
   return {
@@ -63,7 +71,7 @@ function makeBinanceMarginBroker() {
     apiKey: 'test-key',
     secret: 'test-secret',
     sandbox: false,
-    marginType: 'cross',
+    tradingMode: 'cross-margin',
   })
 }
 
@@ -191,16 +199,16 @@ describe('Binance Cross Margin — borrow → repay → transferFunding round-tr
 // ---------------------------------------------------------------------------
 
 describe('Binance Cross Margin — spot-mode broker rejects margin methods', () => {
-  it('getMarginAccount throws when marginType is not cross', async () => {
+  it('getMarginAccount throws when tradingMode is not cross-margin', async () => {
     const spotBroker = new CcxtBroker({
       exchange: 'binance',
       apiKey: 'k',
       secret: 's',
       sandbox: false,
-      // No marginType — defaults to spot mode
+      // No tradingMode — defaults to spot mode
     })
     setInitialized(spotBroker, {})
 
-    await expect(spotBroker.getMarginAccount!()).rejects.toThrow("margin operations require marginType='cross'")
+    await expect(spotBroker.getMarginAccount!()).rejects.toThrow("margin operations require tradingMode='cross-margin'")
   })
 })

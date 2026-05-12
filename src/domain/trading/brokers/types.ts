@@ -443,7 +443,7 @@ export interface IBroker<TMeta = unknown> {
 
   /**
    * Get the margin account snapshot. Optional — only implemented by brokers
-   * that support margin trading (CCXT with marginType='cross').
+   * that support margin trading (CCXT with tradingMode='cross-margin').
    */
   getMarginAccount?(): Promise<MarginAccount>
 

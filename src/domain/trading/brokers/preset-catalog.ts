@@ -112,9 +112,67 @@ export const BINANCE_CROSS_MARGIN_PRESET: BrokerPresetDef = {
   writeOnlyFields: ['apiKey', 'secret'],
   toEngineConfig: (d) => ({
     exchange: 'binance',
-    marginType: 'cross',
+    tradingMode: 'cross-margin',
     sandbox: false,
     // apiKey + secret filled from env at runtime (passed via presetData)
+    apiKey: d.apiKey,
+    secret: d.secret,
+  }),
+  isPaper: () => false,
+}
+
+export const BINANCE_USDM_FUTURES_PRESET: BrokerPresetDef = {
+  id: 'binance-usdm-futures',
+  label: 'Binance USDⓈ-M Futures',
+  description: 'Binance USDⓈ-M Perpetual Futures — USDT-margined, up to 125× leverage.',
+  category: 'crypto',
+  hint: 'USDⓈ-M Futures are settled in USDT/USDC. Generate an API key with Futures permission at binance.com/en/my/settings/api-management.',
+  defaultName: 'binance-usdm',
+  badge: 'BF',
+  badgeColor: 'text-yellow-400',
+  engine: 'ccxt',
+  guardCategory: 'crypto',
+  zodSchema: z.object({
+    apiKey: z.string().min(1).describe('API Key'),
+    secret: z.string().min(1).describe('API Secret'),
+  }),
+  subtitleFields: [
+    { field: 'apiKey', prefix: 'Binance · ' },
+  ],
+  writeOnlyFields: ['apiKey', 'secret'],
+  toEngineConfig: (d) => ({
+    exchange: 'binance',
+    tradingMode: 'usdm-futures',
+    sandbox: false,
+    apiKey: d.apiKey,
+    secret: d.secret,
+  }),
+  isPaper: () => false,
+}
+
+export const BINANCE_COINM_FUTURES_PRESET: BrokerPresetDef = {
+  id: 'binance-coinm-futures',
+  label: 'Binance COIN-M Futures',
+  description: 'Binance COIN-M Perpetual Futures — coin-margined (BTC, ETH, etc.).',
+  category: 'crypto',
+  hint: 'COIN-M Futures are settled in the base cryptocurrency. Generate an API key with Futures permission at binance.com/en/my/settings/api-management.',
+  defaultName: 'binance-coinm',
+  badge: 'BC',
+  badgeColor: 'text-yellow-400',
+  engine: 'ccxt',
+  guardCategory: 'crypto',
+  zodSchema: z.object({
+    apiKey: z.string().min(1).describe('API Key'),
+    secret: z.string().min(1).describe('API Secret'),
+  }),
+  subtitleFields: [
+    { field: 'apiKey', prefix: 'Binance · ' },
+  ],
+  writeOnlyFields: ['apiKey', 'secret'],
+  toEngineConfig: (d) => ({
+    exchange: 'binance',
+    tradingMode: 'coinm-futures',
+    sandbox: false,
     apiKey: d.apiKey,
     secret: d.secret,
   }),
@@ -144,6 +202,8 @@ export const MOCK_PAPER_PRESET: BrokerPresetDef = {
 
 export const BROKER_PRESET_CATALOG: BrokerPresetDef[] = [
   BINANCE_CROSS_MARGIN_PRESET,
+  BINANCE_USDM_FUTURES_PRESET,
+  BINANCE_COINM_FUTURES_PRESET,
   MOCK_PAPER_PRESET,
 ]
 

@@ -6,15 +6,13 @@ export interface CcxtBrokerConfig {
   demoTrading?: boolean
   options?: Record<string, unknown>
   /**
-   * Margin trading mode. When set to 'cross', the broker:
-   * - Sets defaultType: 'margin' on the CCXT exchange instance
-   * - Routes orders through margin endpoints
-   * - Exposes margin-specific methods (getMarginAccount, borrow, repay, transferFunding)
-   *
-   * 'none' (default): spot trading only.
-   * 'cross': Cross Margin (single wallet, all positions share collateral).
+   * Trading mode (selects the Binance product family routed via CCXT defaultType):
+   * - 'spot' (default): regular spot trading
+   * - 'cross-margin': Cross Margin Spot (single wallet, all positions share collateral)
+   * - 'usdm-futures': USDⓈ-M Perpetual Futures (fapi.binance.com)
+   * - 'coinm-futures': COIN-M Perpetual Futures (dapi.binance.com)
    */
-  marginType?: 'none' | 'cross'
+  tradingMode?: 'spot' | 'cross-margin' | 'usdm-futures' | 'coinm-futures'
   // CCXT standard credential fields (all optional — each exchange requires a different subset)
   apiKey?: string
   secret?: string
@@ -62,7 +60,8 @@ export interface CcxtPosition extends Position {
   liquidationPrice?: number
 }
 
-export interface FundingRate {
+/** CCXT-specific funding rate (contract-centric, returned by fetchFundingRateByContract). */
+export interface CcxtFundingRate {
   contract: Contract
   fundingRate: number
   nextFundingTime?: Date

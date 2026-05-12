@@ -37,6 +37,16 @@ vi.mock('ccxt', () => {
     this.sapiPostMarginLoan = vi.fn()
     this.sapiPostMarginRepay = vi.fn()
     this.sapiPostMarginTransfer = vi.fn()
+    // Futures methods
+    this.setLeverage = vi.fn()
+    this.setPositionMode = vi.fn()
+    this.setMarginMode = vi.fn()
+    this.fetchFundingRate = vi.fn()
+    this.fetchPositions = vi.fn().mockResolvedValue([])
+    this.fapiPrivateGetPositionSideDual = vi.fn()
+    this.dapiPrivateGetPositionSideDual = vi.fn()
+    this.fapiPublicGetPremiumIndex = vi.fn()
+    this.dapiPublicGetPremiumIndex = vi.fn()
   })
 
   return {
@@ -1207,7 +1217,7 @@ function makeMarginAccount() {
     apiKey: 'k',
     secret: 's',
     sandbox: false,
-    marginType: 'cross',
+    tradingMode: 'cross-margin',
   })
 }
 
@@ -1306,11 +1316,11 @@ describe('CcxtBroker — Cross Margin mode', () => {
     expect((acc as any).exchange.sapiPostMarginTransfer).toHaveBeenCalledWith({ asset: 'BTC', amount: '0.05', type: 2 })
   })
 
-  it('getMarginAccount throws BrokerError when marginType is not cross', async () => {
-    const acc = makeAccount() // spot mode, no marginType
+  it('getMarginAccount throws BrokerError when tradingMode is not cross-margin', async () => {
+    const acc = makeAccount() // spot mode, no tradingMode
     setInitialized(acc, {})
 
-    await expect(acc.getMarginAccount!()).rejects.toThrow("margin operations require marginType='cross'")
+    await expect(acc.getMarginAccount!()).rejects.toThrow("margin operations require tradingMode='cross-margin'")
   })
 
   it('placeOrder forwards order.marginParams to CCXT params (sideEffectType)', async () => {
@@ -1362,5 +1372,292 @@ describe('CcxtBroker — Cross Margin mode', () => {
     expect(params.sideEffectType).toBeUndefined()
     expect(params.isIsolated).toBeUndefined()
     expect(params.type).toBeUndefined()
+  })
+})
+
+// ==================== Futures mode (USDM) ====================
+
+function makeUsdmAccount() {
+  return new CcxtBroker({
+    exchange: 'binance',
+    apiKey: 'k',
+    secret: 's',
+    sandbox: false,
+    tradingMode: 'usdm-futures',
+  })
+}
+
+function makeCoinmAccount() {
+  return new CcxtBroker({
+    exchange: 'binance',
+    apiKey: 'k',
+    secret: 's',
+    sandbox: false,
+    tradingMode: 'coinm-futures',
+  })
+}
+
+describe('CcxtBroker — Futures mode (USDM)', () => {
+  it('tradingMode: usdm-futures passes defaultType: future to CCXT', () => {
+    const acc = makeUsdmAccount()
+    // Verify the CCXT exchange was constructed with options.defaultType = 'future'
+    const opts = (acc as any).exchange.options ?? {}
+    // Since MockExchange captures constructor args, we inspect the recorded calls
+    // The first (and only) call to the MockExchange constructor
+    const MockExchange = (acc as any).exchange.constructor
+    const lastCallArgs = MockExchange.mock.calls[MockExchange.mock.calls.length - 1][0]
+    expect(lastCallArgs.options?.defaultType).toBe('future')
+  })
+
+  it('isFutures flag is true for usdm-futures tradingMode', () => {
+    const acc = makeUsdmAccount()
+    expect((acc as any).isFutures).toBe(true)
+    expect((acc as any).isMargin).toBe(false)
+  })
+
+  it('isFutures flag is true for coinm-futures tradingMode', () => {
+    const acc = makeCoinmAccount()
+    expect((acc as any).isFutures).toBe(true)
+    expect((acc as any).isMargin).toBe(false)
+  })
+
+  it('placeOrder forwards positionSide / reduceOnly / closePosition / timeInForce', async () => {
+    const acc = makeUsdmAccount()
+    setInitialized(acc, {
+      'BTC/USDT:USDT': makeSwapMarket('BTC', 'USDT', 'BTC/USDT:USDT'),
+    })
+    ;(acc as any).exchange.createOrder = vi.fn().mockResolvedValue({ id: 'f-ord-1', status: 'open' })
+
+    const contract = new Contract()
+    contract.localSymbol = 'BTC/USDT:USDT'
+    const order = new Order()
+    order.action = 'BUY'
+    order.orderType = 'LMT'
+    order.totalQuantity = new Decimal(0.1)
+    order.lmtPrice = new Decimal(60000)
+    order.futuresParams = {
+      positionSide: 'LONG',
+      reduceOnly: false,
+      closePosition: false,
+      timeInForce: 'GTC',
+    }
+
+    const result = await acc.placeOrder(contract, order)
+    expect(result.success).toBe(true)
+
+    const call = (acc as any).exchange.createOrder.mock.calls[0]
+    const params = call[5]
+    expect(params.positionSide).toBe('LONG')
+    expect(params.reduceOnly).toBe(false)
+    expect(params.closePosition).toBe(false)
+    expect(params.timeInForce).toBe('GTC')
+  })
+
+  it('placeOrder does not forward futuresParams when tradingMode is spot', async () => {
+    const acc = makeAccount() // spot mode
+    setInitialized(acc, {
+      'BTC/USDT:USDT': makeSwapMarket('BTC', 'USDT', 'BTC/USDT:USDT'),
+    })
+    ;(acc as any).exchange.createOrder = vi.fn().mockResolvedValue({ id: 's-ord-1', status: 'open' })
+
+    const contract = new Contract()
+    contract.localSymbol = 'BTC/USDT:USDT'
+    const order = new Order()
+    order.action = 'BUY'
+    order.orderType = 'MKT'
+    order.totalQuantity = new Decimal(0.1)
+    order.futuresParams = { positionSide: 'LONG' }
+
+    await acc.placeOrder(contract, order)
+    const params = (acc as any).exchange.createOrder.mock.calls[0][5]
+    expect(params.positionSide).toBeUndefined()
+  })
+
+  it('setLeverage calls exchange.setLeverage and returns LeverageSetting', async () => {
+    const acc = makeUsdmAccount()
+    setInitialized(acc, {})
+    ;(acc as any).exchange.setLeverage = vi.fn().mockResolvedValue({ leverage: 10, maxNotionalValue: '500000' })
+
+    const result = await acc.setLeverage!('BTC/USDT:USDT', 10)
+    expect(result.symbol).toBe('BTC/USDT:USDT')
+    expect(result.leverage).toBe(10)
+    expect(result.maxNotionalValue).toBe('500000')
+    expect((acc as any).exchange.setLeverage).toHaveBeenCalledWith(10, 'BTC/USDT:USDT')
+  })
+
+  it('setLeverage throws when tradingMode is not usdm-futures or coinm-futures', async () => {
+    const acc = makeAccount() // spot mode
+    setInitialized(acc, {})
+    await expect(acc.setLeverage!('BTC/USDT', 10)).rejects.toThrow("futures operations require tradingMode=")
+  })
+
+  it('setPositionMode HEDGE calls setPositionMode(true)', async () => {
+    const acc = makeUsdmAccount()
+    setInitialized(acc, {})
+    ;(acc as any).exchange.setPositionMode = vi.fn().mockResolvedValue({})
+
+    await acc.setPositionMode!('HEDGE')
+    expect((acc as any).exchange.setPositionMode).toHaveBeenCalledWith(true)
+  })
+
+  it('setPositionMode ONE_WAY calls setPositionMode(false)', async () => {
+    const acc = makeUsdmAccount()
+    setInitialized(acc, {})
+    ;(acc as any).exchange.setPositionMode = vi.fn().mockResolvedValue({})
+
+    await acc.setPositionMode!('ONE_WAY')
+    expect((acc as any).exchange.setPositionMode).toHaveBeenCalledWith(false)
+  })
+
+  it('getPositionMode reads fapiPrivateGetPositionSideDual for USDM', async () => {
+    const acc = makeUsdmAccount()
+    setInitialized(acc, {})
+    ;(acc as any).exchange.fapiPrivateGetPositionSideDual = vi.fn().mockResolvedValue({ dualSidePosition: true })
+
+    const mode = await acc.getPositionMode!()
+    expect(mode).toBe('HEDGE')
+    expect((acc as any).exchange.fapiPrivateGetPositionSideDual).toHaveBeenCalledWith({})
+  })
+
+  it('getPositionMode reads dapiPrivateGetPositionSideDual for COINM', async () => {
+    const acc = makeCoinmAccount()
+    setInitialized(acc, {})
+    ;(acc as any).exchange.dapiPrivateGetPositionSideDual = vi.fn().mockResolvedValue({ dualSidePosition: false })
+
+    const mode = await acc.getPositionMode!()
+    expect(mode).toBe('ONE_WAY')
+    expect((acc as any).exchange.dapiPrivateGetPositionSideDual).toHaveBeenCalledWith({})
+  })
+
+  it('setMarginMode ISOLATED calls setMarginMode(isolated, symbol)', async () => {
+    const acc = makeUsdmAccount()
+    setInitialized(acc, {})
+    ;(acc as any).exchange.setMarginMode = vi.fn().mockResolvedValue({})
+
+    await acc.setMarginMode!('BTC/USDT:USDT', 'ISOLATED')
+    expect((acc as any).exchange.setMarginMode).toHaveBeenCalledWith('isolated', 'BTC/USDT:USDT')
+  })
+
+  it('setMarginMode CROSS calls setMarginMode(cross, symbol)', async () => {
+    const acc = makeUsdmAccount()
+    setInitialized(acc, {})
+    ;(acc as any).exchange.setMarginMode = vi.fn().mockResolvedValue({})
+
+    await acc.setMarginMode!('BTC/USDT:USDT', 'CROSS')
+    expect((acc as any).exchange.setMarginMode).toHaveBeenCalledWith('cross', 'BTC/USDT:USDT')
+  })
+
+  it('getFundingRate returns canonical FundingRate from fetchFundingRate', async () => {
+    const acc = makeUsdmAccount()
+    setInitialized(acc, {})
+    const now = Date.now()
+    ;(acc as any).exchange.fetchFundingRate = vi.fn().mockResolvedValue({
+      fundingRate: 0.0001,
+      fundingTimestamp: now,
+      markPrice: 60000,
+      indexPrice: 59990,
+    })
+
+    const rate = await acc.getFundingRate!('BTC/USDT:USDT')
+    expect(rate.symbol).toBe('BTC/USDT:USDT')
+    expect(rate.rate).toBe('0.0001')
+    expect(rate.markPrice).toBe('60000')
+    expect(rate.indexPrice).toBe('59990')
+    expect(rate.nextFundingTime).toBe(new Date(now).toISOString())
+    expect((acc as any).exchange.fetchFundingRate).toHaveBeenCalledWith('BTC/USDT:USDT')
+  })
+
+  it('getMarkPrice returns canonical MarkPriceSnapshot from fapiPublicGetPremiumIndex', async () => {
+    const acc = makeUsdmAccount()
+    setInitialized(acc, {})
+    ;(acc as any).exchange.fapiPublicGetPremiumIndex = vi.fn().mockResolvedValue({
+      markPrice: '60000.5',
+      indexPrice: '59990.1',
+      lastFundingRate: '0.0001',
+    })
+
+    const snap = await acc.getMarkPrice!('BTC/USDT:USDT')
+    expect(snap.symbol).toBe('BTC/USDT:USDT')
+    expect(snap.markPrice).toBe('60000.5')
+    expect(snap.indexPrice).toBe('59990.1')
+    expect(snap.estimatedFundingRate).toBe('0.0001')
+    expect((acc as any).exchange.fapiPublicGetPremiumIndex).toHaveBeenCalledWith({ symbol: 'BTC/USDT:USDT' })
+  })
+
+  it('getMarkPrice uses dapiPublicGetPremiumIndex for COINM', async () => {
+    const acc = makeCoinmAccount()
+    setInitialized(acc, {})
+    ;(acc as any).exchange.dapiPublicGetPremiumIndex = vi.fn().mockResolvedValue({
+      markPrice: '60000',
+      indexPrice: '59980',
+    })
+
+    const snap = await acc.getMarkPrice!('BTC/USD:BTC')
+    expect(snap.markPrice).toBe('60000')
+    expect((acc as any).exchange.dapiPublicGetPremiumIndex).toHaveBeenCalledWith({ symbol: 'BTC/USD:BTC' })
+  })
+
+  it('getLeverage reads from fetchPositions[0].leverage', async () => {
+    const acc = makeUsdmAccount()
+    setInitialized(acc, {})
+    ;(acc as any).exchange.fetchPositions = vi.fn().mockResolvedValue([
+      { leverage: 20, info: { maxNotionalValue: '1000000' } },
+    ])
+
+    const setting = await acc.getLeverage!('BTC/USDT:USDT')
+    expect(setting.symbol).toBe('BTC/USDT:USDT')
+    expect(setting.leverage).toBe(20)
+    expect(setting.maxNotionalValue).toBe('1000000')
+    expect((acc as any).exchange.fetchPositions).toHaveBeenCalledWith(['BTC/USDT:USDT'])
+  })
+
+  it('getLeverage throws when no position data returned', async () => {
+    const acc = makeUsdmAccount()
+    setInitialized(acc, {})
+    ;(acc as any).exchange.fetchPositions = vi.fn().mockResolvedValue([])
+
+    await expect(acc.getLeverage!('BTC/USDT:USDT')).rejects.toThrow('No leverage data for BTC/USDT:USDT')
+  })
+})
+
+// ==================== Backward compatibility (cross-margin) ====================
+
+describe('CcxtBroker — Backward compatibility (cross-margin)', () => {
+  it('tradingMode: cross-margin sets isMargin=true, isFutures=false', () => {
+    const acc = makeMarginAccount()
+    expect((acc as any).isMargin).toBe(true)
+    expect((acc as any).isFutures).toBe(false)
+  })
+
+  it('tradingMode: cross-margin passes defaultType: margin to CCXT', () => {
+    const acc = makeMarginAccount()
+    const MockExchange = (acc as any).exchange.constructor
+    const lastCallArgs = MockExchange.mock.calls[MockExchange.mock.calls.length - 1][0]
+    expect(lastCallArgs.options?.defaultType).toBe('margin')
+  })
+
+  it('margin methods (getMarginAccount, borrow, repay, transferFunding) still work with tradingMode=cross-margin', async () => {
+    const acc = makeMarginAccount()
+    setInitialized(acc, {})
+    ;(acc as any).exchange.sapiGetMarginAccount = vi.fn().mockResolvedValue({
+      totalAssetOfBtc: '1.0',
+      totalLiabilityOfBtc: '0.5',
+      totalNetAssetOfBtc: '0.5',
+      marginLevel: '2.0',
+      borrowEnabled: true,
+      transferEnabled: true,
+      tradeEnabled: true,
+    })
+
+    const result = await acc.getMarginAccount!()
+    expect(result.marginLevel).toBe('2.0')
+    expect(result.borrowEnabled).toBe(true)
+  })
+
+  it('futures methods throw for cross-margin broker', async () => {
+    const acc = makeMarginAccount()
+    setInitialized(acc, {})
+    await expect(acc.setLeverage!('BTC/USDT', 10)).rejects.toThrow("futures operations require tradingMode=")
+    await expect(acc.getPositionMode!()).rejects.toThrow("futures operations require tradingMode=")
   })
 })

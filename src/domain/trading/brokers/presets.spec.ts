@@ -17,6 +17,8 @@ import {
   getBrokerPreset,
   isPaperPreset,
   BINANCE_CROSS_MARGIN_PRESET,
+  BINANCE_USDM_FUTURES_PRESET,
+  BINANCE_COINM_FUTURES_PRESET,
   MOCK_PAPER_PRESET,
 } from './preset-catalog.js'
 import { BROKER_ENGINE_REGISTRY } from './registry.js'
@@ -26,8 +28,10 @@ import { BUILTIN_BROKER_PRESETS } from './presets.js'
 
 /** Minimal valid presetConfig for each preset id. Use to round-trip through schema + engine. */
 const SAMPLE_CONFIGS: Record<string, Record<string, unknown>> = {
-  'binance-cross-margin': { apiKey: 'k', secret: 's' },
-  'mock-paper':           {},
+  'binance-cross-margin':  { apiKey: 'k', secret: 's' },
+  'binance-usdm-futures':  { apiKey: 'k', secret: 's' },
+  'binance-coinm-futures': { apiKey: 'k', secret: 's' },
+  'mock-paper':            {},
 }
 
 // ==================== Catalog integrity ====================
@@ -38,9 +42,9 @@ describe('BROKER_PRESET_CATALOG', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
-  it('contains exactly binance-cross-margin and mock-paper', () => {
+  it('contains exactly binance-cross-margin, binance-usdm-futures, binance-coinm-futures, and mock-paper', () => {
     const ids = BROKER_PRESET_CATALOG.map(p => p.id).sort()
-    expect(ids).toEqual(['binance-cross-margin', 'mock-paper'])
+    expect(ids).toEqual(['binance-coinm-futures', 'binance-cross-margin', 'binance-usdm-futures', 'mock-paper'])
   })
 
   it('every preset id has a sample config in the test fixture', () => {
@@ -74,13 +78,27 @@ describe.each(BROKER_PRESET_CATALOG)('preset $id', (preset) => {
 // ==================== Engine config translation ====================
 
 describe('preset → engine config translation', () => {
-  it('Binance Cross Margin sets exchange=binance, marginType=cross, sandbox=false', () => {
+  it('Binance Cross Margin sets exchange=binance, tradingMode=cross-margin, sandbox=false', () => {
     const cfg = BINANCE_CROSS_MARGIN_PRESET.toEngineConfig({ apiKey: 'k', secret: 's' })
     expect(cfg.exchange).toBe('binance')
-    expect(cfg.marginType).toBe('cross')
+    expect(cfg.tradingMode).toBe('cross-margin')
     expect(cfg.sandbox).toBe(false)
     expect(cfg.apiKey).toBe('k')
     expect(cfg.secret).toBe('s')
+  })
+
+  it('Binance USDM Futures sets exchange=binance, tradingMode=usdm-futures, sandbox=false', () => {
+    const cfg = BINANCE_USDM_FUTURES_PRESET.toEngineConfig({ apiKey: 'k', secret: 's' })
+    expect(cfg.exchange).toBe('binance')
+    expect(cfg.tradingMode).toBe('usdm-futures')
+    expect(cfg.sandbox).toBe(false)
+  })
+
+  it('Binance COINM Futures sets exchange=binance, tradingMode=coinm-futures, sandbox=false', () => {
+    const cfg = BINANCE_COINM_FUTURES_PRESET.toEngineConfig({ apiKey: 'k', secret: 's' })
+    expect(cfg.exchange).toBe('binance')
+    expect(cfg.tradingMode).toBe('coinm-futures')
+    expect(cfg.sandbox).toBe(false)
   })
 
   it('Mock Paper produces empty engine config', () => {
