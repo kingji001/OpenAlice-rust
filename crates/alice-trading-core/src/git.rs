@@ -531,6 +531,22 @@ impl TradingGit {
         self.current_round = Some(round);
     }
 
+    /// Return the pending commit hash (set by `commit()`, cleared by `push()` / `reject()`).
+    pub fn pending_hash(&self) -> Option<String> {
+        self.pending_hash.clone()
+    }
+
+    /// Read-only view of the staging area.
+    pub fn staging_area(&self) -> &[Operation] {
+        &self.staging_area
+    }
+
+    /// Replace the staging area with a new set of operations (used by Phase 4e
+    /// to inject `clientOrderId` into `PlaceOrder` ops before `push_with_dispatcher`).
+    pub fn replace_staging_area(&mut self, ops: Vec<Operation>) {
+        self.staging_area = ops;
+    }
+
     /// Get pending order IDs — mirrors TS `getPendingOrderIds`.
     pub fn get_pending_order_ids(&self) -> Vec<(String, String)> {
         use std::collections::{HashMap, HashSet};

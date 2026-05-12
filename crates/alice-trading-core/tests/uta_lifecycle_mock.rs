@@ -126,3 +126,39 @@ async fn commit_emits_event_when_event_tx_set() {
         UtaEvent::HealthChange { .. } => panic!("expected CommitNotify, got HealthChange"),
     }
 }
+
+#[tokio::test]
+async fn push_creates_then_closes_journal_entry() {
+    let dir = TempDir::new().unwrap();
+    let broker = Arc::new(MockBroker::new(MockBrokerOptions::default()));
+    broker.set_quote("mock|AAPL", 100.0);
+
+    let state = UtaState::new(
+        "journal-test".to_string(),
+        broker.clone(),
+        vec![],
+        dir.path().to_path_buf(),
+    );
+    let (handle, _join) = UtaActor::spawn(state, 16);
+
+    handle.add(buy_op("AAPL")).await.unwrap();
+    handle.commit("journal test".to_string()).await.unwrap();
+    let push_result = handle.push().await.unwrap();
+
+    // Journal entry should be moved to done/ after Step 5.
+    let executing_dir = dir.path().join("trading/journal-test/executing");
+    let done_dir = executing_dir.join("done");
+    let done_file = done_dir.join(format!("{}.json", push_result.hash));
+    assert!(
+        done_file.exists(),
+        "journal entry should be in executing/done/ after push; hash={}",
+        push_result.hash
+    );
+
+    // No file should remain at the executing/<hash>.json level.
+    let live_file = executing_dir.join(format!("{}.json", push_result.hash));
+    assert!(
+        !live_file.exists(),
+        "live journal entry should be moved to done/"
+    );
+}

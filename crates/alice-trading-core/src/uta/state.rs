@@ -7,6 +7,7 @@ use tokio::sync::mpsc;
 use crate::brokers::traits::Broker;
 use crate::git::{TradingGit, TradingGitConfig};
 use crate::guards::traits::Guard;
+use crate::journal::ExecutionJournal;
 use crate::uta::command::UtaEvent;
 use crate::uta::health::HealthState;
 
@@ -19,6 +20,7 @@ pub struct UtaState {
     pub commit_path: PathBuf,
     pub event_tx: Option<mpsc::Sender<UtaEvent>>,
     pub data_root: PathBuf,
+    pub journal: ExecutionJournal,
 }
 
 impl UtaState {
@@ -30,6 +32,7 @@ impl UtaState {
         data_root: PathBuf,
     ) -> Self {
         let commit_path = crate::uta::persist::commit_path(&account_id, &data_root);
+        let journal = ExecutionJournal::new(&account_id, &data_root);
         let git_config = TradingGitConfig::stub();
         Self {
             account_id,
@@ -40,6 +43,7 @@ impl UtaState {
             commit_path,
             event_tx: None,
             data_root,
+            journal,
         }
     }
 
@@ -59,6 +63,7 @@ impl UtaState {
             None => crate::git::TradingGit::new(crate::git::TradingGitConfig::stub()),
         };
         let commit_path = crate::uta::persist::commit_path(&account_id, &data_root);
+        let journal = ExecutionJournal::new(&account_id, &data_root);
         Self {
             account_id,
             git,
@@ -68,6 +73,7 @@ impl UtaState {
             commit_path,
             event_tx: None,
             data_root,
+            journal,
         }
     }
 }

@@ -11,9 +11,10 @@ use tokio::task::JoinHandle;
 use crate::brokers::error::{BrokerError, BrokerErrorCode};
 use crate::brokers::traits::Broker;
 use crate::brokers::types::{BrokerHealth, BrokerHealthInfo};
+use crate::journal::{ExecutionIntent, ExecutionResult};
 use crate::types::{
-    AddResult, CommitPrepareResult, GitExportState, GitState, Operation, OrderStatusUpdate,
-    PushResult, RejectResult, SyncResult,
+    AddResult, CommitPrepareResult, GitExportState, GitState, Operation, OperationResult,
+    OrderStatusUpdate, PushResult, RejectResult, SyncResult,
 };
 use crate::uta::command::{RecoverySignal, UtaCommand, UtaEvent};
 use crate::uta::state::UtaState;
@@ -154,14 +155,14 @@ impl UtaActor {
     }
 
     async fn handle_push(&mut self) -> Result<PushResult, BrokerError> {
-        // 1. Reject if disabled (mirrors TS UTA._doPush() permanent-config check).
+        // Reject if disabled (mirrors TS UTA._doPush() permanent-config check).
         if self.state.health.disabled {
             return Err(BrokerError::new(
                 BrokerErrorCode::Config,
                 format!("Account \"{}\" is disabled", self.state.account_id),
             ));
         }
-        // 2. Reject if offline (mirrors TS UTA._doPush() health check).
+        // Reject if offline (mirrors TS UTA._doPush() health check).
         if self.state.health.health() == BrokerHealth::Offline {
             return Err(BrokerError::new(
                 BrokerErrorCode::Network,
@@ -169,7 +170,47 @@ impl UtaActor {
             ));
         }
 
-        // 3. Run TradingGit push with an async per-op dispatcher closure.
+        // Snapshot pre-push state for the journal intent.
+        let pending_hash = self.state.git.pending_hash().ok_or_else(|| {
+            BrokerError::new(BrokerErrorCode::Unknown, "no pending commit".to_string())
+        })?;
+        let operations = self.state.git.staging_area().to_vec();
+        let mut ops_with_cli_ids = operations.clone();
+
+        // Allocate one client_order_id per op and INJECT into PlaceOrder.order["clientOrderId"].
+        // For other operation variants (cancel/close/modify) a cli-id is allocated per-op per
+        // v4 spec, but the injection target differs per variant. For Phase 4e Mock, only
+        // PlaceOrder is injected; other variants don't currently flow clientOrderId downstream.
+        let client_order_ids: Vec<String> = operations
+            .iter()
+            .map(|_| self.state.broker.allocate_client_order_id())
+            .collect();
+        for (op, cli_id) in ops_with_cli_ids.iter_mut().zip(client_order_ids.iter()) {
+            if let Operation::PlaceOrder { order, .. } = op {
+                if let Some(obj) = order.as_object_mut() {
+                    obj.insert(
+                        "clientOrderId".to_string(),
+                        serde_json::Value::String(cli_id.clone()),
+                    );
+                }
+            }
+        }
+        // Replace the staging area with the cli-id-injected operations before push.
+        self.state
+            .git
+            .replace_staging_area(ops_with_cli_ids.clone());
+
+        // Step 1: record intent (fsync) — captures operations + client_order_ids.
+        let intent = ExecutionIntent {
+            commit_hash: pending_hash.clone(),
+            client_order_ids: client_order_ids.clone(),
+            operations: ops_with_cli_ids.clone(),
+            started_at: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+            broker_id: self.state.account_id.clone(),
+        };
+        let handle = self.state.journal.record_intent(intent).await?;
+
+        // Step 2: broker calls via TradingGit push_with_dispatcher.
         let broker = self.state.broker.clone();
         let dispatcher = move |op: &Operation| {
             let broker = broker.clone();
@@ -179,7 +220,6 @@ impl UtaActor {
                     Box<dyn std::future::Future<Output = Result<Value, String>> + Send>,
                 >
         };
-
         let push_result = self
             .state
             .git
@@ -187,18 +227,26 @@ impl UtaActor {
             .await
             .map_err(|e| BrokerError::new(BrokerErrorCode::Unknown, e))?;
 
-        // 4. Health is intentionally NOT updated here. Per-op rejections
-        //    (failures within the push batch) are not broker-level failures
-        //    — they're order-level outcomes. TS UnifiedTradingAccount._doPush
-        //    similarly never touches health; broker-level health transitions
-        //    happen only in _callBroker (broker-RPC wrapper, not present in
-        //    Rust yet — Phase 4d Task D scope). Phase 4d intentionally keeps
-        //    the actor's health untouched on push to match TS semantics.
-        //    Phase 4f will wire health updates through the actual broker
-        //    RPC layer (BrokerError → on_failure; success returns → on_success).
+        // Step 3: record completion (fsync) — records OperationResult[].
+        let all_results: Vec<OperationResult> = push_result
+            .submitted
+            .iter()
+            .chain(push_result.rejected.iter())
+            .cloned()
+            .collect();
+        let exec_result = ExecutionResult {
+            commit_hash: push_result.hash.clone(),
+            completed_at: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+            results: all_results,
+            success: push_result.rejected.is_empty(),
+        };
+        self.state
+            .journal
+            .record_completion(&handle, exec_result)
+            .await?;
 
-        // 5. Persist commit atomically. Persist failures are logged but do not
-        //    fail the push — matches TS behavior.
+        // Step 4: persist commit atomically. Persist failures are logged but do
+        // not fail the push — matches TS behavior.
         let export = self.state.git.export_state();
         if let Err(e) = crate::uta::persist::persist_commit_atomic(
             &self.state.account_id,
@@ -215,12 +263,13 @@ impl UtaActor {
             );
         }
 
-        // 6. Emit commit.notify event if subscribed.
-        // BACK-PRESSURE NOTE: send().await blocks the actor if the consumer
-        // is slow and the channel is full. Acceptable for Phase 4d
-        // (in-process tests only). Phase 4f's napi tsfn wiring should
-        // either size the channel appropriately or switch to try_send with
-        // a logged drop on overflow.
+        // Step 5: close journal entry — move executing/<hash>.json → done/<hash>.json.
+        self.state.journal.close(handle).await?;
+
+        // Emit commit.notify event if subscribed.
+        // BACK-PRESSURE NOTE: send().await blocks the actor if the consumer is slow
+        // and the channel is full. Acceptable for Phase 4d/4e in-process tests.
+        // Phase 4f's napi tsfn wiring should size the channel or use try_send.
         if let Some(tx) = &self.state.event_tx {
             let _ = tx
                 .send(UtaEvent::CommitNotify {
