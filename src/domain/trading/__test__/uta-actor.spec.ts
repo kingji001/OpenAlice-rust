@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
-import { AsyncQueue, TsUtaActor, type UtaCommand } from '../uta-actor.js'
+import { describe, it, expect } from 'vitest'
+import { AsyncQueue, TsUtaActor } from '../uta-actor.js'
 
 describe('AsyncQueue', () => {
   it('pop after push returns the item synchronously (Promise.resolve)', async () => {

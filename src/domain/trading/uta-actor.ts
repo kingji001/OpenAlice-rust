@@ -35,8 +35,7 @@ export class AsyncQueue<T> {
   }
 
   pop(): Promise<T> {
-    const item = this.items.shift()
-    if (item !== undefined) return Promise.resolve(item)
+    if (this.items.length > 0) return Promise.resolve(this.items.shift() as T)
     return new Promise<T>((resolve) => this.waiters.push(resolve))
   }
 
@@ -133,15 +132,25 @@ export class TsUtaActor {
     while (!this.stopped) {
       const queued = await this.queue.pop()
       this.reentrancyDepth++
+      let timeoutId: ReturnType<typeof setTimeout> | undefined
       try {
-        const work = this.dispatch(queued.cmd)
+        const work = Promise.resolve(this.dispatch(queued.cmd))
         const result = queued.timeoutMs
-          ? await Promise.race([work, this.timeoutPromise(queued.timeoutMs, queued.cmd.type)])
+          ? await Promise.race([
+              work,
+              new Promise<never>((_, reject) => {
+                timeoutId = setTimeout(
+                  () => reject(new Error(`TsUtaActor: command '${queued.cmd.type}' timed out after ${queued.timeoutMs}ms`)),
+                  queued.timeoutMs,
+                )
+              }),
+            ])
           : await work
         queued.resolve(result)
       } catch (e) {
         queued.reject(e)
       } finally {
+        if (timeoutId !== undefined) clearTimeout(timeoutId)
         this.reentrancyDepth--
       }
     }
@@ -188,9 +197,4 @@ export class TsUtaActor {
     }
   }
 
-  private timeoutPromise(ms: number, name: string): Promise<never> {
-    return new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`TsUtaActor: command '${name}' timed out after ${ms}ms`)), ms),
-    )
-  }
 }
