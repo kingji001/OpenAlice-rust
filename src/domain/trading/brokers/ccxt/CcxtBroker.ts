@@ -1240,7 +1240,9 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     const methodName = this.tradingMode === 'usdm-futures'
       ? 'fapiPublicGetPremiumIndex'
       : 'dapiPublicGetPremiumIndex'
-    const result = await ex[methodName]({ symbol }) as { markPrice?: string; indexPrice?: string; estimatedSettlePrice?: string; lastFundingRate?: string }
+    // Implicit API calls require Binance native symbol (BTCUSDT), not CCXT-canonical (BTC/USDT).
+    const market = this.exchange.market(symbol)
+    const result = await ex[methodName]({ symbol: market.id }) as { markPrice?: string; indexPrice?: string; estimatedSettlePrice?: string; lastFundingRate?: string }
     return {
       symbol,
       markPrice: String(result.markPrice ?? '0'),

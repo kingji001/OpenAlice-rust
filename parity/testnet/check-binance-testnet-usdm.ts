@@ -65,7 +65,9 @@ if (!demoEnv) {
 
 // CCXT canonical symbol for USDⓈ-M perpetual BTC futures
 const SYMBOL = 'BTC/USDT'
-const QUANTITY = '0.001'
+// Binance USDM minimum notional is $50; with DISCOUNT=0.5 we get qty * (mark/2) >= $50.
+// At mark ~$80k that means qty >= 0.00125. Round up to 0.002 for headroom.
+const QUANTITY = '0.002'
 const DISCOUNT = 0.5
 const TARGET_LEVERAGE = 5
 
