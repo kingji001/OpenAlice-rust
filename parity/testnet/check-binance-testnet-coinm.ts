@@ -38,10 +38,34 @@
  */
 
 import Decimal from 'decimal.js'
+import * as ccxt from 'ccxt'
 import { Contract, Order } from '@traderalice/ibkr-types'
 import { CcxtBroker } from '../../src/domain/trading/brokers/ccxt/CcxtBroker.js'
-import { requireEnv, logSkip, logOk, logFail, logCleanup, redact } from './_helpers.js'
+import { requireEnv, logSkip, logOk, logFail, logCleanup, redact, shouldDryRun, logDryRun } from './_helpers.js'
 import '../../src/domain/trading/contract-ext.js'
+
+// ── Dry-run path ─────────────────────────────────────────────────────────────
+if (shouldDryRun()) {
+  console.log('[dry-run] check-binance-testnet-coinm.ts intended call sequence:')
+  logDryRun('new CcxtBroker', { exchange: 'binance', tradingMode: 'coinm-futures', sandbox: true })
+  logDryRun('broker.init', {})
+  logDryRun('broker.getAccount', {})
+  logDryRun('exchange.loadMarkets', {})
+  logDryRun('findCoinmBtcPerp', { type: 'swap', settle: 'BTC', base: 'BTC', quote: 'USD' })
+  logDryRun('broker.setPositionMode', 'ONE_WAY')
+  logDryRun('broker.setLeverage', { symbol: 'BTC/USD:BTC', leverage: 5 })
+  logDryRun('broker.setMarginMode', { symbol: 'BTC/USD:BTC', mode: 'CROSS' })
+  logDryRun('broker.getMarkPrice', 'BTC/USD:BTC')
+  logDryRun('broker.getFundingRate', 'BTC/USD:BTC')
+  logDryRun('broker.getPositionMode', {})
+  logDryRun('broker.placeOrder', { contract: 'BTC/USD:BTC', side: 'BUY', type: 'LMT', limit: '<50% below mark>', quantity: 1, positionSide: 'BOTH', timeInForce: 'GTC' })
+  logDryRun('broker.getOrders', ['<orderId>'])
+  logDryRun('broker.cancelOrder', '<orderId>')
+  logDryRun('broker.getOrders', ['<orderId>'])
+  logDryRun('broker.close', {})
+  console.log('[ok] dry-run completed; 16 intended calls printed')
+  process.exit(0)
+}
 
 // ── Env-var gate ────────────────────────────────────────────────────────────
 const env = requireEnv('BINANCE_COINM_TESTNET_KEY', 'BINANCE_COINM_TESTNET_SECRET')
@@ -49,41 +73,23 @@ if (!env) {
   logSkip('BINANCE_COINM_TESTNET_KEY and BINANCE_COINM_TESTNET_SECRET required; skipping live testnet COIN-M futures check')
 }
 
-/**
- * COIN-M symbol candidates to try in order.
- * CCXT dapi.binance.com perpetual is typically 'BTC/USD:BTC';
- * some CCXT versions expose it as 'BTC/USD' without the settle suffix.
- * We try the canonical form first and fall back if the market lookup fails.
- */
-const KNOWN_SYMBOL_CANDIDATES = ['BTC/USD:BTC', 'BTC/USD']
-
 const QUANTITY = '1'       // 1 contract — minimum for COIN-M (each contract = 100 USD)
 const DISCOUNT = 0.5
 const TARGET_LEVERAGE = 5
 
 /**
- * Attempt to resolve a COIN-M symbol by checking which candidate appears in the
- * broker's loaded market catalog. Returns the first matching symbol or throws.
+ * Auto-detect the BTC COIN-M perpetual symbol by inspecting the exchange's
+ * loaded market catalog. Looks for a swap market settled in BTC with
+ * base=BTC, quote=USD, and no expiry (perpetual).
  */
-async function resolveCoinMSymbol(broker: CcxtBroker): Promise<string> {
-  // getQuote will throw if the symbol isn't in the catalog; use it as a probe
-  for (const candidate of KNOWN_SYMBOL_CANDIDATES) {
-    try {
-      const contract = new Contract()
-      contract.symbol = 'BTC'
-      contract.localSymbol = candidate
-      contract.currency = 'USD'
-      await broker.getQuote(contract)
-      logOk(`resolveCoinMSymbol: using symbol '${candidate}'`)
-      return candidate
-    } catch {
-      // not in catalog — try next
+async function findCoinmBtcPerp(exchange: ccxt.Exchange): Promise<string> {
+  await exchange.loadMarkets()
+  for (const m of Object.values(exchange.markets)) {
+    if (m.type === 'swap' && m.settle === 'BTC' && m.base === 'BTC' && m.quote === 'USD' && !m.expiry) {
+      return m.symbol
     }
   }
-  throw new Error(
-    `None of the COIN-M symbol candidates resolved: ${KNOWN_SYMBOL_CANDIDATES.join(', ')}. ` +
-    'Check CCXT version and testnet market catalog.',
-  )
+  throw new Error('Could not find BTC coin-margined perpetual on this exchange')
 }
 
 async function main(): Promise<void> {
@@ -104,8 +110,24 @@ async function main(): Promise<void> {
   await broker.init()
   logOk('broker.init() passed — authenticated to Binance COIN-M Futures testnet')
 
-  // Resolve the correct COIN-M symbol for BTC perpetual
-  const SYMBOL = await resolveCoinMSymbol(broker)
+  // Pre-flight balance check: futures account needs some BTC to proceed
+  const account = await broker.getAccount()
+  const accountBalance = parseFloat(String(account.netLiquidation ?? '0'))
+  logOk(`getAccount() → netLiquidation=${account.netLiquidation} ${account.baseCurrency}`)
+  if (accountBalance < 0.0001) {
+    logSkip(`insufficient testnet COINM balance — netLiquidation=${accountBalance.toFixed(8)} (need ≥0.0001 BTC); fund the account first`)
+  }
+
+  // Resolve the correct COIN-M symbol by scanning the live market catalog
+  // Use a standalone CCXT exchange to call findCoinmBtcPerp (broker.exchange is private)
+  const exchanges = ccxt as unknown as Record<string, new (opts: Record<string, unknown>) => ccxt.Exchange>
+  const rawExchange = new exchanges['binancecoinm']!({
+    apiKey: env!['BINANCE_COINM_TESTNET_KEY'],
+    secret: env!['BINANCE_COINM_TESTNET_SECRET'],
+    sandbox: true,
+  })
+  const SYMBOL = await findCoinmBtcPerp(rawExchange)
+  logOk(`findCoinmBtcPerp: using symbol '${SYMBOL}'`)
 
   // 3. setPositionMode('ONE_WAY') — idempotent
   try {

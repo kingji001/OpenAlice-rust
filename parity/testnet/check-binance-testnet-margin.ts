@@ -28,8 +28,28 @@
 import Decimal from 'decimal.js'
 import { Contract, Order } from '@traderalice/ibkr-types'
 import { CcxtBroker } from '../../src/domain/trading/brokers/ccxt/CcxtBroker.js'
-import { requireEnv, logSkip, logOk, logFail, logCleanup, redact } from './_helpers.js'
+import { requireEnv, logSkip, logOk, logFail, logCleanup, redact, shouldDryRun, logDryRun } from './_helpers.js'
 import '../../src/domain/trading/contract-ext.js'
+
+// ── Dry-run path ─────────────────────────────────────────────────────────────
+if (shouldDryRun()) {
+  console.log('[dry-run] check-binance-testnet-margin.ts intended call sequence:')
+  logDryRun('new CcxtBroker', { exchange: 'binance', tradingMode: 'cross-margin', sandbox: true })
+  logDryRun('broker.init', {})
+  logDryRun('broker.getMarginAccount', {})
+  logDryRun('broker.getMarginAssets', {})
+  logDryRun('broker.getQuote', 'BTC/USDT')
+  logDryRun('broker.placeOrder', { contract: 'BTC/USDT', side: 'BUY', type: 'LMT', limit: '<50% below market>', quantity: 0.001, sideEffectType: 'NO_SIDE_EFFECT' })
+  logDryRun('broker.getOrders', ['<orderId>'])
+  logDryRun('broker.cancelOrder', '<orderId>')
+  logDryRun('broker.borrow', { asset: 'USDT', amount: '1' })
+  logDryRun('broker.repay', { asset: 'USDT', amount: '1' })
+  logDryRun('broker.transferFunding', { type: 'SPOT_TO_CROSS_MARGIN', asset: 'USDT', amount: '1' })
+  logDryRun('broker.transferFunding', { type: 'CROSS_MARGIN_TO_SPOT', asset: 'USDT', amount: '1' })
+  logDryRun('broker.close', {})
+  console.log('[ok] dry-run completed; 13 intended calls printed')
+  process.exit(0)
+}
 
 // ── Env-var gate ────────────────────────────────────────────────────────────
 const env = requireEnv('BINANCE_TESTNET_KEY', 'BINANCE_TESTNET_SECRET')
@@ -79,6 +99,13 @@ async function main(): Promise<void> {
   if (marginAssets.length > 0) {
     const sample = marginAssets.slice(0, 3).map(a => `${a.asset}(free=${a.free})`)
     logOk(`  sample assets: ${sample.join(', ')}`)
+  }
+
+  // Pre-flight balance check: margin account needs USDT free ≥ 5 to proceed
+  const usdtAsset = marginAssets.find(a => a.asset === 'USDT')
+  const usdtFree = usdtAsset ? parseFloat(usdtAsset.free ?? '0') : 0
+  if (!marginAccount.borrowEnabled && usdtFree < 5) {
+    logSkip(`insufficient testnet margin balance — USDT free=${usdtFree.toFixed(4)} (need ≥5); fund the account first`)
   }
 
   // 5–7. Order placement + cancellation

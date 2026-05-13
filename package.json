@@ -12,7 +12,9 @@
     "test": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:bbProvider": "vitest run --config vitest.bbProvider.config.ts",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:testnet": "pnpm tsx parity/testnet/check-binance-testnet-spot.ts && pnpm tsx parity/testnet/check-binance-testnet-margin.ts && pnpm tsx parity/testnet/check-binance-testnet-usdm.ts && pnpm tsx parity/testnet/check-binance-testnet-coinm.ts",
+    "test:testnet:dry-run": "BINANCE_TESTNET_DRY_RUN=1 pnpm run test:testnet"
   },
   "keywords": [
     "trading",

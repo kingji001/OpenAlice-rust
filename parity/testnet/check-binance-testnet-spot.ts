@@ -25,7 +25,23 @@
 import Decimal from 'decimal.js'
 import { Contract, Order } from '@traderalice/ibkr-types'
 import { CcxtBroker } from '../../src/domain/trading/brokers/ccxt/CcxtBroker.js'
-import { requireEnv, logSkip, logOk, logFail, logCleanup, redact } from './_helpers.js'
+import { requireEnv, logSkip, logOk, logFail, logCleanup, redact, shouldDryRun, logDryRun } from './_helpers.js'
+
+// ── Dry-run path ─────────────────────────────────────────────────────────────
+if (shouldDryRun()) {
+  console.log('[dry-run] check-binance-testnet-spot.ts intended call sequence:')
+  logDryRun('new CcxtBroker', { exchange: 'binance', tradingMode: 'spot', sandbox: true })
+  logDryRun('broker.init', {})
+  logDryRun('broker.getAccount', {})
+  logDryRun('broker.getQuote', 'BTC/USDT')
+  logDryRun('broker.placeOrder', { contract: 'BTC/USDT', side: 'BUY', type: 'LMT', limit: '<50% below market>', quantity: 0.001 })
+  logDryRun('broker.getOrders', ['<orderId>'])
+  logDryRun('broker.cancelOrder', '<orderId>')
+  logDryRun('broker.getOrders', ['<orderId>'])
+  logDryRun('broker.close', {})
+  console.log('[ok] dry-run completed; 9 intended calls printed')
+  process.exit(0)
+}
 
 // ── Env-var gate ────────────────────────────────────────────────────────────
 const env = requireEnv('BINANCE_TESTNET_KEY', 'BINANCE_TESTNET_SECRET')

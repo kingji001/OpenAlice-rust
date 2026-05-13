@@ -30,8 +30,29 @@
 import Decimal from 'decimal.js'
 import { Contract, Order } from '@traderalice/ibkr-types'
 import { CcxtBroker } from '../../src/domain/trading/brokers/ccxt/CcxtBroker.js'
-import { requireEnv, logSkip, logOk, logFail, logCleanup, redact } from './_helpers.js'
+import { requireEnv, logSkip, logOk, logFail, logCleanup, redact, shouldDryRun, logDryRun } from './_helpers.js'
 import '../../src/domain/trading/contract-ext.js'
+
+// ── Dry-run path ─────────────────────────────────────────────────────────────
+if (shouldDryRun()) {
+  console.log('[dry-run] check-binance-testnet-usdm.ts intended call sequence:')
+  logDryRun('new CcxtBroker', { exchange: 'binance', tradingMode: 'usdm-futures', sandbox: true })
+  logDryRun('broker.init', {})
+  logDryRun('broker.getAccount', {})
+  logDryRun('broker.setPositionMode', 'ONE_WAY')
+  logDryRun('broker.setLeverage', { symbol: 'BTC/USDT', leverage: 5 })
+  logDryRun('broker.setMarginMode', { symbol: 'BTC/USDT', mode: 'CROSS' })
+  logDryRun('broker.getMarkPrice', 'BTC/USDT')
+  logDryRun('broker.getFundingRate', 'BTC/USDT')
+  logDryRun('broker.getPositionMode', {})
+  logDryRun('broker.placeOrder', { contract: 'BTC/USDT', side: 'BUY', type: 'LMT', limit: '<50% below mark>', quantity: 0.001, positionSide: 'BOTH', timeInForce: 'GTC' })
+  logDryRun('broker.getOrders', ['<orderId>'])
+  logDryRun('broker.cancelOrder', '<orderId>')
+  logDryRun('broker.getOrders', ['<orderId>'])
+  logDryRun('broker.close', {})
+  console.log('[ok] dry-run completed; 14 intended calls printed')
+  process.exit(0)
+}
 
 // ── Env-var gate ────────────────────────────────────────────────────────────
 const env = requireEnv('BINANCE_USDM_TESTNET_KEY', 'BINANCE_USDM_TESTNET_SECRET')
@@ -62,6 +83,14 @@ async function main(): Promise<void> {
   // 2. Connect / authenticate
   await broker.init()
   logOk('broker.init() passed — authenticated to Binance USDⓈ-M Futures testnet')
+
+  // Pre-flight balance check: futures account needs some USDT to proceed
+  const account = await broker.getAccount()
+  const accountBalance = parseFloat(String(account.netLiquidation ?? '0'))
+  logOk(`getAccount() → netLiquidation=${account.netLiquidation} ${account.baseCurrency}`)
+  if (accountBalance < 1) {
+    logSkip(`insufficient testnet USDM balance — netLiquidation=${accountBalance.toFixed(4)} (need ≥1); fund the account first`)
+  }
 
   // 3. setPositionMode('ONE_WAY') — idempotent (Binance returns an error if already set;
   //    we swallow it gracefully because it means we're already in the right mode)
