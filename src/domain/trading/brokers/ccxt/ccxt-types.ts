@@ -6,6 +6,18 @@ export interface CcxtBrokerConfig {
   demoTrading?: boolean
   options?: Record<string, unknown>
   /**
+   * Simulation routing for non-live testing:
+   * - undefined or 'none' (default): live mainnet endpoints
+   * - 'sandbox': legacy testnet (testnet.binance.vision for spot, testnet.binancefuture.com for futures)
+   *              CCXT considers futures sandbox deprecated — we set disableFuturesSandboxWarning=true to bypass.
+   *              Cross Margin Spot (sapi) has NO sandbox URL in CCXT — config will throw if used.
+   * - 'demo': new official Binance Demo Trading (demo-api.binance.com / demo-fapi.binance.com / demo-dapi.binance.com)
+   *           Recommended for futures. Spot also works. Cross Margin Spot still NOT supported (no demo sapi URL).
+   *
+   * The legacy `sandbox: boolean` field is retained for backward compat — `sandbox: true` is treated as `simulationMode: 'sandbox'`.
+   */
+  simulationMode?: 'none' | 'sandbox' | 'demo'
+  /**
    * Trading mode (selects the Binance product family routed via CCXT defaultType):
    * - 'spot' (default): regular spot trading
    * - 'cross-margin': Cross Margin Spot (single wallet, all positions share collateral)

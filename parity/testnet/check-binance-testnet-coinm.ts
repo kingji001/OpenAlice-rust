@@ -5,8 +5,8 @@
  * LIVE NETWORK TEST — gated by env vars. Exits 0 (skipped) when credentials
  * are not set, so this script is safe in CI and local dev without credentials.
  *
- * Tests the COIN-M Futures lifecycle against the Binance Futures testnet:
- *   1. Construct CcxtBroker (tradingMode='coinm-futures', sandbox=true)
+ * Tests the COIN-M Futures lifecycle against the Binance Demo Trading environment:
+ *   1. Construct CcxtBroker (tradingMode='coinm-futures', simulationMode='demo')
  *   2. Connect via init()
  *   3. setPositionMode('ONE_WAY') — idempotent setup
  *   4. setLeverage for the COIN-M symbol
@@ -19,21 +19,19 @@
  *  11. Cancel order (try/finally)
  *  12. Verify cancellation
  *
+ * Uses Binance Demo Trading (demo-dapi.binance.com) via CCXT enableDemoTrading(true).
+ * The same BINANCE_DEMO_KEY / BINANCE_DEMO_SECRET covers both USDM and COINM demo.
+ *
  * COIN-M Symbol note:
  *   CCXT's canonical symbol for the BTC perpetual on dapi.binance.com is
  *   'BTC/USD:BTC'. This script tries 'BTC/USD:BTC' first, then falls back to
  *   'BTC/USD' — whichever resolves correctly against the loaded market catalog.
- *   The testnet symbol is documented in KNOWN_SYMBOL_CANDIDATES below.
- *
- * Testnet account: https://testnet.binancefuture.com/ → switch to COIN-M tab
- *   → API Management → create a separate COIN-M key (different from USDM key).
- *   Assumption: COINM testnet may share the same portal but requires a different
- *   API key pair from USDM. Verify on the testnet portal.
  *
  * Required env vars:
- *   BINANCE_COINM_TESTNET_KEY    — COIN-M Futures testnet API key
- *   BINANCE_COINM_TESTNET_SECRET — COIN-M Futures testnet API secret
+ *   BINANCE_DEMO_KEY    — Binance Demo Trading API key (same key covers USDM and COINM)
+ *   BINANCE_DEMO_SECRET — Binance Demo Trading API secret
  *
+ * Demo account registration: https://demo.binance.com/
  * Run: pnpm tsx parity/testnet/check-binance-testnet-coinm.ts
  */
 
@@ -41,13 +39,13 @@ import Decimal from 'decimal.js'
 import * as ccxt from 'ccxt'
 import { Contract, Order } from '@traderalice/ibkr-types'
 import { CcxtBroker } from '../../src/domain/trading/brokers/ccxt/CcxtBroker.js'
-import { requireEnv, logSkip, logOk, logFail, logCleanup, redact, shouldDryRun, logDryRun } from './_helpers.js'
+import { requireDemoEnv, logSkip, logOk, logFail, logCleanup, redact, shouldDryRun, logDryRun } from './_helpers.js'
 import '../../src/domain/trading/contract-ext.js'
 
 // ── Dry-run path ─────────────────────────────────────────────────────────────
 if (shouldDryRun()) {
   console.log('[dry-run] check-binance-testnet-coinm.ts intended call sequence:')
-  logDryRun('new CcxtBroker', { exchange: 'binance', tradingMode: 'coinm-futures', sandbox: true })
+  logDryRun('new CcxtBroker', { exchange: 'binance', tradingMode: 'coinm-futures', simulationMode: 'demo' })
   logDryRun('broker.init', {})
   logDryRun('broker.getAccount', {})
   logDryRun('exchange.loadMarkets', {})
@@ -68,9 +66,9 @@ if (shouldDryRun()) {
 }
 
 // ── Env-var gate ────────────────────────────────────────────────────────────
-const env = requireEnv('BINANCE_COINM_TESTNET_KEY', 'BINANCE_COINM_TESTNET_SECRET')
-if (!env) {
-  logSkip('BINANCE_COINM_TESTNET_KEY and BINANCE_COINM_TESTNET_SECRET required; skipping live testnet COIN-M futures check')
+const demoEnv = requireDemoEnv()
+if (!demoEnv) {
+  logSkip('BINANCE_DEMO_KEY and BINANCE_DEMO_SECRET required; skipping Binance Demo Trading COIN-M futures check')
 }
 
 const QUANTITY = '1'       // 1 contract — minimum for COIN-M (each contract = 100 USD)
@@ -93,39 +91,43 @@ async function findCoinmBtcPerp(exchange: ccxt.Exchange): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  console.log(`[info] key=${redact(env!['BINANCE_COINM_TESTNET_KEY'])}  secret=${redact(env!['BINANCE_COINM_TESTNET_SECRET'])}`)
+  console.log(`[info] key=${redact(demoEnv!.apiKey)}  secret=${redact(demoEnv!.secret)}`)
 
   // 1. Construct broker
   const broker = new CcxtBroker({
-    id: 'binance-testnet-coinm',
+    id: 'binance-demo-coinm',
     exchange: 'binance',
-    sandbox: true,
+    sandbox: false,
+    simulationMode: 'demo',
     tradingMode: 'coinm-futures',
-    apiKey: env!['BINANCE_COINM_TESTNET_KEY'],
-    secret: env!['BINANCE_COINM_TESTNET_SECRET'],
+    apiKey: demoEnv!.apiKey,
+    secret: demoEnv!.secret,
   })
-  logOk('CcxtBroker constructed (tradingMode=coinm-futures, sandbox=true)')
+  logOk('CcxtBroker constructed (tradingMode=coinm-futures, simulationMode=demo)')
 
   // 2. Connect / authenticate
   await broker.init()
-  logOk('broker.init() passed — authenticated to Binance COIN-M Futures testnet')
+  logOk('broker.init() passed — authenticated to Binance Demo Trading COIN-M futures')
 
   // Pre-flight balance check: futures account needs some BTC to proceed
   const account = await broker.getAccount()
   const accountBalance = parseFloat(String(account.netLiquidation ?? '0'))
   logOk(`getAccount() → netLiquidation=${account.netLiquidation} ${account.baseCurrency}`)
   if (accountBalance < 0.0001) {
-    logSkip(`insufficient testnet COINM balance — netLiquidation=${accountBalance.toFixed(8)} (need ≥0.0001 BTC); fund the account first`)
+    logSkip(`insufficient demo COINM balance — netLiquidation=${accountBalance.toFixed(8)} (need ≥0.0001 BTC); fund the demo account first`)
   }
 
   // Resolve the correct COIN-M symbol by scanning the live market catalog
   // Use a standalone CCXT exchange to call findCoinmBtcPerp (broker.exchange is private)
   const exchanges = ccxt as unknown as Record<string, new (opts: Record<string, unknown>) => ccxt.Exchange>
   const rawExchange = new exchanges['binancecoinm']!({
-    apiKey: env!['BINANCE_COINM_TESTNET_KEY'],
-    secret: env!['BINANCE_COINM_TESTNET_SECRET'],
-    sandbox: true,
+    apiKey: demoEnv!.apiKey,
+    secret: demoEnv!.secret,
   })
+  // Enable demo trading on the raw exchange as well for market catalog resolution
+  if (typeof (rawExchange as any).enableDemoTrading === 'function') {
+    (rawExchange as any).enableDemoTrading(true)
+  }
   const SYMBOL = await findCoinmBtcPerp(rawExchange)
   logOk(`findCoinmBtcPerp: using symbol '${SYMBOL}'`)
 

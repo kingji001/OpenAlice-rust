@@ -5,8 +5,8 @@
  * LIVE NETWORK TEST — gated by env vars. Exits 0 (skipped) when credentials
  * are not set, so this script is safe in CI and local dev without credentials.
  *
- * Tests the USDⓈ-M Futures lifecycle against the Binance Futures testnet:
- *   1. Construct CcxtBroker (tradingMode='usdm-futures', sandbox=true)
+ * Tests the USDⓈ-M Futures lifecycle against the Binance Demo Trading environment:
+ *   1. Construct CcxtBroker (tradingMode='usdm-futures', simulationMode='demo')
  *   2. Connect via init()
  *   3. setPositionMode('ONE_WAY') — idempotent setup
  *   4. setLeverage('BTC/USDT', 5) — verify returned leverage
@@ -19,24 +19,27 @@
  *  11. Cancel order (try/finally)
  *  12. Verify cancellation
  *
- * Required env vars:
- *   BINANCE_USDM_TESTNET_KEY    — USDⓈ-M Futures testnet API key
- *   BINANCE_USDM_TESTNET_SECRET — USDⓈ-M Futures testnet API secret
+ * Uses Binance Demo Trading (demo-fapi.binance.com) via CCXT enableDemoTrading(true).
+ * This is the official Binance replacement for the deprecated futures sandbox.
  *
- * Testnet account: https://testnet.binancefuture.com/ → register → API Management
+ * Required env vars:
+ *   BINANCE_DEMO_KEY    — Binance Demo Trading API key (covers both USDM and COINM)
+ *   BINANCE_DEMO_SECRET — Binance Demo Trading API secret
+ *
+ * Demo account registration: https://demo.binance.com/
  * Run: pnpm tsx parity/testnet/check-binance-testnet-usdm.ts
  */
 
 import Decimal from 'decimal.js'
 import { Contract, Order } from '@traderalice/ibkr-types'
 import { CcxtBroker } from '../../src/domain/trading/brokers/ccxt/CcxtBroker.js'
-import { requireEnv, logSkip, logOk, logFail, logCleanup, redact, shouldDryRun, logDryRun } from './_helpers.js'
+import { requireDemoEnv, logSkip, logOk, logFail, logCleanup, redact, shouldDryRun, logDryRun } from './_helpers.js'
 import '../../src/domain/trading/contract-ext.js'
 
 // ── Dry-run path ─────────────────────────────────────────────────────────────
 if (shouldDryRun()) {
   console.log('[dry-run] check-binance-testnet-usdm.ts intended call sequence:')
-  logDryRun('new CcxtBroker', { exchange: 'binance', tradingMode: 'usdm-futures', sandbox: true })
+  logDryRun('new CcxtBroker', { exchange: 'binance', tradingMode: 'usdm-futures', simulationMode: 'demo' })
   logDryRun('broker.init', {})
   logDryRun('broker.getAccount', {})
   logDryRun('broker.setPositionMode', 'ONE_WAY')
@@ -55,9 +58,9 @@ if (shouldDryRun()) {
 }
 
 // ── Env-var gate ────────────────────────────────────────────────────────────
-const env = requireEnv('BINANCE_USDM_TESTNET_KEY', 'BINANCE_USDM_TESTNET_SECRET')
-if (!env) {
-  logSkip('BINANCE_USDM_TESTNET_KEY and BINANCE_USDM_TESTNET_SECRET required; skipping live testnet USDM-futures check')
+const demoEnv = requireDemoEnv()
+if (!demoEnv) {
+  logSkip('BINANCE_DEMO_KEY and BINANCE_DEMO_SECRET required; skipping Binance Demo Trading USDM-futures check')
 }
 
 // CCXT canonical symbol for USDⓈ-M perpetual BTC futures
@@ -67,29 +70,30 @@ const DISCOUNT = 0.5
 const TARGET_LEVERAGE = 5
 
 async function main(): Promise<void> {
-  console.log(`[info] key=${redact(env!['BINANCE_USDM_TESTNET_KEY'])}  secret=${redact(env!['BINANCE_USDM_TESTNET_SECRET'])}`)
+  console.log(`[info] key=${redact(demoEnv!.apiKey)}  secret=${redact(demoEnv!.secret)}`)
 
   // 1. Construct broker
   const broker = new CcxtBroker({
-    id: 'binance-testnet-usdm',
+    id: 'binance-demo-usdm',
     exchange: 'binance',
-    sandbox: true,
+    sandbox: false,
+    simulationMode: 'demo',
     tradingMode: 'usdm-futures',
-    apiKey: env!['BINANCE_USDM_TESTNET_KEY'],
-    secret: env!['BINANCE_USDM_TESTNET_SECRET'],
+    apiKey: demoEnv!.apiKey,
+    secret: demoEnv!.secret,
   })
-  logOk('CcxtBroker constructed (tradingMode=usdm-futures, sandbox=true)')
+  logOk('CcxtBroker constructed (tradingMode=usdm-futures, simulationMode=demo)')
 
   // 2. Connect / authenticate
   await broker.init()
-  logOk('broker.init() passed — authenticated to Binance USDⓈ-M Futures testnet')
+  logOk('broker.init() passed — authenticated to Binance Demo Trading USDM-futures')
 
   // Pre-flight balance check: futures account needs some USDT to proceed
   const account = await broker.getAccount()
   const accountBalance = parseFloat(String(account.netLiquidation ?? '0'))
   logOk(`getAccount() → netLiquidation=${account.netLiquidation} ${account.baseCurrency}`)
   if (accountBalance < 1) {
-    logSkip(`insufficient testnet USDM balance — netLiquidation=${accountBalance.toFixed(4)} (need ≥1); fund the account first`)
+    logSkip(`insufficient demo USDM balance — netLiquidation=${accountBalance.toFixed(4)} (need ≥1); fund the demo account first`)
   }
 
   // 3. setPositionMode('ONE_WAY') — idempotent (Binance returns an error if already set;

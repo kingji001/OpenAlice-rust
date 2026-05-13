@@ -9,6 +9,11 @@
  *   3. Each script exits 0 and prints [dry-run] lines in BINANCE_TESTNET_DRY_RUN=1 mode.
  *   4. Each script prints "[ok] dry-run completed" at the end of dry-run mode.
  *
+ * Margin script note:
+ *   check-binance-testnet-margin.ts always exits with [skip] regardless of env vars —
+ *   Cross Margin Spot has no testnet/demo URL in CCXT. It is tested in the skip check
+ *   (env cleared) and the dry-run check (BINANCE_TESTNET_DRY_RUN=1).
+ *
  * These tests catch accidental breakage of import paths, env-var gating, and
  * dry-run mode without requiring live Binance testnet credentials.
  *
@@ -31,14 +36,13 @@ const SCRIPTS = [
 ]
 
 // Env with all credential vars explicitly cleared so CI never picks up ambient creds.
+// USDM and COINM now use BINANCE_DEMO_* (single demo account for both futures products).
 const NO_CREDS_ENV: NodeJS.ProcessEnv = {
   ...process.env,
   BINANCE_TESTNET_KEY: '',
   BINANCE_TESTNET_SECRET: '',
-  BINANCE_USDM_TESTNET_KEY: '',
-  BINANCE_USDM_TESTNET_SECRET: '',
-  BINANCE_COINM_TESTNET_KEY: '',
-  BINANCE_COINM_TESTNET_SECRET: '',
+  BINANCE_DEMO_KEY: '',
+  BINANCE_DEMO_SECRET: '',
   BINANCE_TESTNET_DRY_RUN: '',
 }
 

@@ -99,6 +99,7 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     exchange: z.string(),
     sandbox: z.boolean().default(false),
     demoTrading: z.boolean().default(false),
+    simulationMode: z.enum(['none', 'sandbox', 'demo']).optional(),
     options: z.record(z.string(), z.unknown()).optional(),
     tradingMode: z.enum(['spot', 'cross-margin', 'usdm-futures', 'coinm-futures']).optional(),
     // All 10 CCXT standard credential fields, all optional.
@@ -122,6 +123,7 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     { name: 'exchange', type: 'select', label: 'Exchange', required: true, options: [] },
     { name: 'sandbox', type: 'boolean', label: 'Sandbox Mode', default: false },
     { name: 'demoTrading', type: 'boolean', label: 'Demo Trading', default: false },
+    { name: 'simulationMode', type: 'select', label: 'Simulation Mode', default: 'none', options: [{ value: 'none', label: 'None (live)' }, { value: 'sandbox', label: 'Sandbox (legacy testnet)' }, { value: 'demo', label: 'Demo Trading (Binance official)' }] },
   ]
 
   static fromConfig(config: { id: string; label?: string; brokerConfig: Record<string, unknown> }): CcxtBroker {
@@ -132,6 +134,7 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       exchange: bc.exchange,
       sandbox: bc.sandbox,
       demoTrading: bc.demoTrading,
+      simulationMode: bc.simulationMode,
       options: bc.options,
       tradingMode: bc.tradingMode,
       apiKey: bc.apiKey,
@@ -172,7 +175,13 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     this.meta = { exchange: config.exchange }
     this.overrides = exchangeOverrides[config.exchange] ?? {}
     this.id = config.id ?? `${config.exchange}-main`
-    this.label = config.label ?? `${config.exchange.charAt(0).toUpperCase() + config.exchange.slice(1)} ${config.sandbox ? 'Testnet' : 'Live'}`
+
+    // Resolve effective simulation mode (with legacy sandbox: true alias)
+    const effectiveMode: 'none' | 'sandbox' | 'demo' =
+      config.simulationMode ?? (config.sandbox ? 'sandbox' : 'none')
+    const exchangeLabel = config.exchange.charAt(0).toUpperCase() + config.exchange.slice(1)
+    const modeLabel = effectiveMode === 'sandbox' ? 'Testnet' : effectiveMode === 'demo' ? 'Demo' : 'Live'
+    this.label = config.label ?? `${exchangeLabel} ${modeLabel}`
 
     const exchanges = ccxt as unknown as Record<string, new (opts: Record<string, unknown>) => Exchange>
     const ExchangeClass = exchanges[config.exchange]
@@ -209,12 +218,34 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     }
     this.exchange = new ExchangeClass(credentials)
 
-    if (config.sandbox) {
+    if (effectiveMode === 'sandbox') {
+      // Legacy CCXT testnet — needed escape hatch for futures (testnet.binancefuture.com)
+      if (this.isFutures) {
+        this.exchange.options['disableFuturesSandboxWarning'] = true
+      }
+      if (this.isMargin) {
+        throw new Error(
+          'Cross Margin Spot (sapi) does not support CCXT sandbox mode. ' +
+          'Use simulationMode: "demo" for futures testing, or test Cross Margin against live mainnet with extreme caution.'
+        )
+      }
       this.exchange.setSandboxMode(true)
-    }
-
-    if (config.demoTrading) {
-      (this.exchange as unknown as { enableDemoTrading: (enable: boolean) => void }).enableDemoTrading(true)
+    } else if (effectiveMode === 'demo') {
+      // CCXT demo trading — new official path for Binance futures testing
+      if (this.isMargin) {
+        throw new Error(
+          'Cross Margin Spot (sapi) is not supported in Binance Demo Trading. ' +
+          'Test Cross Margin against live mainnet with extreme caution.'
+        )
+      }
+      // enableDemoTrading is a method on the binance class that swaps urls.api → urls.demo
+      if (typeof (this.exchange as any).enableDemoTrading === 'function') {
+        (this.exchange as any).enableDemoTrading(true)
+      } else {
+        throw new Error(
+          `Exchange ${config.exchange} does not support enableDemoTrading. Demo mode is Binance-specific (CCXT method).`
+        )
+      }
     }
   }
 

@@ -61,6 +61,19 @@ export function logCleanup(message: string): void {
   console.log(`[cleanup] ${message}`)
 }
 
+/**
+ * Require BINANCE_DEMO_KEY and BINANCE_DEMO_SECRET env vars.
+ * Returns { apiKey, secret } if both are set, or null if either is missing.
+ * One demo account covers both USDⓈ-M and COIN-M futures via CCXT enableDemoTrading(true).
+ * Register at https://demo.binance.com/
+ */
+export function requireDemoEnv(): { apiKey: string; secret: string } | null {
+  const apiKey = process.env['BINANCE_DEMO_KEY']
+  const secret = process.env['BINANCE_DEMO_SECRET']
+  if (!apiKey || !secret) return null
+  return { apiKey, secret }
+}
+
 // ── Dry-run mode ─────────────────────────────────────────────────────────────
 
 /**
